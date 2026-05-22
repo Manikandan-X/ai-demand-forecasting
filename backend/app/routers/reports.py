@@ -23,6 +23,10 @@ from app.services.report_service import (
     generate_pdf_report
 )
 
+from app.utils.notification_utils import (
+    create_notification
+)
+
 router = APIRouter(
     prefix="/reports",
     tags=["Reports"]
@@ -79,6 +83,16 @@ async def export_excel_report(
         f"dataset_{dataset_id}.xlsx"
     )
 
+    
+    await create_notification(
+        db=db,
+        title="Report Generated",
+        message="Reports are generated",
+        user_id=current_user.id,
+        notification_type="report",
+        is_admin=True
+    )
+    
     # BACKGROUND TASK
     background_tasks.add_task(
         log_report_generation
@@ -136,6 +150,16 @@ async def export_pdf_report(
         f"dataset_{dataset_id}.pdf"
     )
 
+    
+    await create_notification(
+        db=db,
+        title="Report Generated",
+        message="Reports are generated",
+        user_id=current_user.id,
+        notification_type="report",
+        is_admin=True
+    )
+    
     # BACKGROUND TASK
     background_tasks.add_task(
         log_report_generation

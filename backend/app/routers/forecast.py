@@ -124,9 +124,11 @@ async def advanced_forecast(
     
     await create_notification(
         db=db,
-        user_id=current_user.id,
         title="Forecast Completed",
-        message=f"Forecast generated successfully for dataset: {dataset.filename}"
+        message="Forecast generation is completed",
+        user_id=current_user.id,
+        notification_type="forecast",
+        is_admin=True
     )
 
     return {

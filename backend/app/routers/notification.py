@@ -31,14 +31,24 @@ async def get_notifications(
     )
 ):
 
-    notifications = db.query(
-        Notification
-    ).filter(
-        Notification.user_id ==
-        current_user.id
-    ).order_by(
-        Notification.created_at.desc()
-    ).all()
+    if current_user.role == "admin":
+
+        notifications = db.query(
+            Notification
+        ).order_by(
+            Notification.created_at.desc()
+        ).all()
+
+    else:
+
+        notifications = db.query(
+            Notification
+        ).filter(
+            Notification.user_id ==
+            current_user.id
+        ).order_by(
+            Notification.created_at.desc()
+        ).all()
 
     return notifications
 
@@ -52,14 +62,24 @@ async def unread_count(
     )
 ):
 
-    count = db.query(
-        Notification
-    ).filter(
-        Notification.user_id ==
-        current_user.id,
+    if current_user.role == "admin":
 
-        Notification.is_read == False
-    ).count()
+        count = db.query(
+            Notification
+        ).filter(
+            Notification.is_read == False
+        ).count()
+
+    else:
+
+        count = db.query(
+            Notification
+        ).filter(
+            Notification.user_id ==
+            current_user.id,
+
+            Notification.is_read == False
+        ).count()
 
     return {
         "unread_count": count
@@ -75,26 +95,32 @@ async def mark_all_read(
     )
 ):
 
-    notifications = db.query(
+    query = db.query(
         Notification
-    ).filter(
-        Notification.user_id ==
-        current_user.id,
+    )
 
+    if current_user.role != "admin":
+
+        query = query.filter(
+            Notification.user_id ==
+            current_user.id
+        )
+
+    notifications = query.filter(
         Notification.is_read == False
     ).all()
 
     for item in notifications:
-
         item.is_read = True
 
     db.commit()
 
     return {
-        "message": "All notifications marked as read"
+        "message":
+        "All notifications marked as read"
     }
-    
-    
+
+
 # MARK SINGLE NOTIFICATION AS READ
 @router.put("/{notification_id}/read")
 async def mark_as_read(
@@ -105,14 +131,21 @@ async def mark_as_read(
     )
 ):
 
-    notification = db.query(
+    query = db.query(
         Notification
     ).filter(
-        Notification.id == notification_id,
+        Notification.id ==
+        notification_id
+    )
 
-        Notification.user_id ==
-        current_user.id
-    ).first()
+    if current_user.role != "admin":
+
+        query = query.filter(
+            Notification.user_id ==
+            current_user.id
+        )
+
+    notification = query.first()
 
     if not notification:
 
@@ -126,7 +159,6 @@ async def mark_as_read(
     db.commit()
 
     return {
-        "message": "Notification marked as read"
+        "message":
+        "Notification marked as read"
     }
-
-

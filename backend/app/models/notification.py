@@ -24,7 +24,8 @@ class Notification(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id"),
+        nullable=True
     )
 
     title = Column(
@@ -33,6 +34,16 @@ class Notification(Base):
 
     message = Column(
         String(1000)
+    )
+
+    notification_type = Column(
+        String(100),
+        default="general"
+    )
+
+    is_admin = Column(
+        Boolean,
+        default=False
     )
 
     is_read = Column(

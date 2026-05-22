@@ -15,8 +15,17 @@ from app.db.deps import get_db
 from app.models.dataset import Dataset
 from app.models.user import User
 
-from app.core.dependencies import get_current_user
-from app.services.dataset_service import process_dataset
+from app.core.dependencies import (
+    get_current_user
+)
+
+from app.services.dataset_service import (
+    process_dataset
+)
+
+from app.utils.notification_utils import (
+    create_notification
+)
 
 router = APIRouter(
     prefix="/dataset",
@@ -27,61 +36,102 @@ UPLOAD_FOLDER = "uploads"
 
 
 @router.post("/upload")
-def upload_dataset(
+async def upload_dataset(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    )
 ):
 
-    allowed_extensions = [
-        ".csv",
-        ".xlsx"
-    ]
+    try:
 
-    file_extension = os.path.splitext(
-        file.filename
-    )[1]
+        allowed_extensions = [
+            ".csv",
+            ".xlsx"
+        ]
 
-    if file_extension not in allowed_extensions:
+        file_extension = os.path.splitext(
+            file.filename
+        )[1]
+
+        if file_extension not in allowed_extensions:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Only CSV and Excel files allowed"
+            )
+
+        file_path = os.path.join(
+            UPLOAD_FOLDER,
+            file.filename
+        )
+
+        with open(file_path, "wb") as buffer:
+
+            shutil.copyfileobj(
+                file.file,
+                buffer
+            )
+
+        dataset = Dataset(
+            filename=file.filename,
+            file_path=file_path,
+            uploaded_by=current_user.id
+        )
+
+        db.add(dataset)
+
+        db.commit()
+
+        db.refresh(dataset)
+
+        summary = process_dataset(
+            file_path
+        )
+
+        # OPTIONAL SUCCESS NOTIFICATION
+        await create_notification(
+            db=db,
+            title="Dataset Uploaded",
+            message="Dataset uploaded successfully",
+            user_id=current_user.id,
+            notification_type="upload",
+            is_admin=True
+        )
+
+        return {
+            "message":
+            "Dataset uploaded successfully",
+
+            "dataset_id":
+            dataset.id,
+
+            "filename":
+            dataset.filename,
+
+            "summary":
+            summary
+        }
+
+    except Exception as e:
+
+        # FAILED NOTIFICATION
+        await create_notification(
+            db=db,
+            title="Upload Failed",
+            message="Dataset upload fails",
+            user_id=current_user.id,
+            notification_type="upload",
+            is_admin=True
+        )
 
         raise HTTPException(
-            status_code=400,
-            detail="Only CSV and Excel files allowed"
+            status_code=500,
+            detail=str(e)
         )
 
-    file_path = os.path.join(
-        UPLOAD_FOLDER,
-        file.filename
-    )
 
-    with open(file_path, "wb") as buffer:
-
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
-
-    dataset = Dataset(
-        filename=file.filename,
-        file_path=file_path,
-        uploaded_by=current_user.id
-    )
-
-    db.add(dataset)
-
-    db.commit()
-
-    db.refresh(dataset)
-    
-    summary = process_dataset(file_path)
-
-    return {
-        "message": "Dataset uploaded successfully",
-        "dataset_id": dataset.id,
-        "filename": dataset.filename,
-        "summary": summary
-    }
-    
 @router.get("/")
 def get_datasets(
     page: int = Query(1, ge=1),
@@ -116,7 +166,8 @@ def get_datasets(
         "total": total,
         "datasets": datasets
     }
-    
+
+
 @router.get("/search/")
 def search_datasets(
     keyword: str,
@@ -141,6 +192,7 @@ def search_datasets(
 
     return datasets
 
+
 @router.get("/filter/")
 def filter_datasets(
     start_date: str = None,
@@ -163,13 +215,15 @@ def filter_datasets(
     if start_date:
 
         query = query.filter(
-            Dataset.created_at >= start_date
+            Dataset.created_at >=
+            start_date
         )
 
     if end_date:
 
         query = query.filter(
-            Dataset.created_at <= end_date
+            Dataset.created_at <=
+            end_date
         )
 
     datasets = query.all()
