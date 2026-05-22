@@ -6,6 +6,7 @@ from fastapi import UploadFile
 from fastapi import File
 from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import Query
 
 from sqlalchemy.orm import Session
 
@@ -80,3 +81,97 @@ def upload_dataset(
         "filename": dataset.filename,
         "summary": summary
     }
+    
+@router.get("/")
+def get_datasets(
+    page: int = Query(1, ge=1),
+    limit: int = Query(5, ge=1, le=100),
+
+    db: Session = Depends(get_db),
+
+    current_user: User = Depends(
+        get_current_user
+    )
+):
+
+    skip = (page - 1) * limit
+
+    datasets = db.query(
+        Dataset
+    ).filter(
+        Dataset.uploaded_by ==
+        current_user.id
+    ).offset(skip).limit(limit).all()
+
+    total = db.query(
+        Dataset
+    ).filter(
+        Dataset.uploaded_by ==
+        current_user.id
+    ).count()
+
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "datasets": datasets
+    }
+    
+@router.get("/search/")
+def search_datasets(
+    keyword: str,
+
+    db: Session = Depends(get_db),
+
+    current_user: User = Depends(
+        get_current_user
+    )
+):
+
+    datasets = db.query(
+        Dataset
+    ).filter(
+        Dataset.uploaded_by ==
+        current_user.id,
+
+        Dataset.filename.ilike(
+            f"%{keyword}%"
+        )
+    ).all()
+
+    return datasets
+
+@router.get("/filter/")
+def filter_datasets(
+    start_date: str = None,
+    end_date: str = None,
+
+    db: Session = Depends(get_db),
+
+    current_user: User = Depends(
+        get_current_user
+    )
+):
+
+    query = db.query(
+        Dataset
+    ).filter(
+        Dataset.uploaded_by ==
+        current_user.id
+    )
+
+    if start_date:
+
+        query = query.filter(
+            Dataset.created_at >= start_date
+        )
+
+    if end_date:
+
+        query = query.filter(
+            Dataset.created_at <= end_date
+        )
+
+    datasets = query.all()
+
+    return datasets

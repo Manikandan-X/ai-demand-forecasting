@@ -1,8 +1,10 @@
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
+from sqlalchemy import Boolean
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
+
 from sqlalchemy.orm import relationship
 
 from datetime import datetime
@@ -10,9 +12,9 @@ from datetime import datetime
 from app.db.base import Base
 
 
-class Dataset(Base):
+class Notification(Base):
 
-    __tablename__ = "datasets"
+    __tablename__ = "notifications"
 
     id = Column(
         Integer,
@@ -20,21 +22,22 @@ class Dataset(Base):
         index=True
     )
 
-    filename = Column(
-        String(255),
-        nullable=False,
-        index=True
-    )
-
-    file_path = Column(
-        String(500),
-        nullable=False
-    )
-
-    uploaded_by = Column(
+    user_id = Column(
         Integer,
-        ForeignKey("users.id"),
-        index=True
+        ForeignKey("users.id")
+    )
+
+    title = Column(
+        String(255)
+    )
+
+    message = Column(
+        String(1000)
+    )
+
+    is_read = Column(
+        Boolean,
+        default=False
     )
 
     created_at = Column(
@@ -42,13 +45,7 @@ class Dataset(Base):
         default=datetime.utcnow
     )
 
-    # RELATIONSHIP
     user = relationship(
         "User",
-        back_populates="datasets"
-    )
-
-    forecasts = relationship(
-        "ForecastHistory",
-        back_populates="dataset"
+        back_populates="notifications"
     )

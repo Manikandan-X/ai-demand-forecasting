@@ -18,6 +18,10 @@ import Forecast from "./pages/Forecast";
 
 import Reports from "./pages/Reports";
 
+import ForecastHistory from "./pages/ForecastHistory";
+
+import AdminDashboard from "./pages/AdminDashboard";
+
 function App() {
 
   return (
@@ -63,6 +67,15 @@ function App() {
         />
 
         <Route
+          path="/forecast-history"
+          element={
+            <ProtectedRoute>
+              <ForecastHistory />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/reports"
           element={
             <ProtectedRoute>
@@ -71,6 +84,16 @@ function App() {
           }
         />
 
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute
+              adminOnly={true}
+            >
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
 
     </BrowserRouter>

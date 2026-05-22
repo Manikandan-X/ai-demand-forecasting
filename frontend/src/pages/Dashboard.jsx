@@ -1,10 +1,11 @@
 import { useState } from "react";
-
 import { Link } from "react-router-dom";
 
 import API from "../api/axios";
 
 import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
+import SkeletonCard from "../components/SkeletonCard";
 
 import {
   BarChart,
@@ -14,219 +15,328 @@ import {
   Tooltip,
   CartesianGrid,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  Legend,
 } from "recharts";
 
+import { motion } from "framer-motion";
+
 export default function Dashboard() {
+  // =========================
+  // STATE
+  // =========================
+  const [datasetId, setDatasetId] = useState("");
 
-  const [datasetId, setDatasetId] =
-    useState("");
+  const [analytics, setAnalytics] = useState(null);
+  const [chartData, setChartData] = useState([]);
+  const [productData, setProductData] = useState([]);
 
-  const [analytics, setAnalytics] =
-    useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const [chartData, setChartData] =
-    useState([]);
+  // FILTERS
+  const [selectedRegion, setSelectedRegion] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  const handleLoadDashboard =
-    async () => {
+  // DROPDOWN DATA
+  const [regions, setRegions] = useState([]);
+  const [categories, setCategories] = useState([]);
 
-      try {
+  // =========================
+  // LOAD DASHBOARD (FIXED)
+  // =========================
+  const handleLoadDashboard = async () => {
+    if (!datasetId) {
+      alert("Please enter dataset ID");
+      return;
+    }
 
-        const response = await API.get(
-          `/dashboard/${datasetId}`
-        );
+    try {
+      setLoading(true);
 
-        setAnalytics(
-          response.data.analytics
-        );
+      // ✅ SAFE PARAMS OBJECT (FIXED)
+      const params = {
+        id: datasetId,
+      };
 
-        const monthlyData =
-          Object.entries(
-            response.data.analytics
-              .monthly_sales
-          ).map(
-            ([month, sales]) => ({
-              month,
-              sales,
-            })
-          );
-
-        setChartData(monthlyData);
-
-      } catch (error) {
-
-        console.error(error);
-
-        alert("Failed to load dashboard");
+      if (selectedRegion) {
+        params.region = selectedRegion;
       }
-    };
 
-  return (
-    <>
-    <Navbar />
+      if (selectedCategory) {
+        params.category = selectedCategory;
+      }
 
-    <div className="min-h-screen bg-gray-100 p-8">
+      if (startDate) {
+        params.start_date = startDate;
+      }
 
-      <h1 className="text-3xl font-bold mb-8">
-        AI Demand Forecasting Dashboard
-      </h1>
+      if (endDate) {
+        params.end_date = endDate;
+      }
 
-      <div className="flex gap-4 mb-8">
+      const response = await API.get(`/dashboard/${datasetId}`, {
+        params,
+      });
 
-        <Link
-          to="/upload"
-          className="bg-blue-600 text-white px-5 py-3 rounded-lg"
-        >
-          Upload Dataset
-        </Link>
+      const analyticsData = response.data.analytics;
 
-        <Link
-          to="/forecast"
-          className="bg-green-600 text-white px-5 py-3 rounded-lg"
-        >
-          Forecast
-        </Link>
+      setAnalytics(analyticsData);
 
-        <Link
-          to="/reports"
-          className="bg-red-600 text-white px-5 py-3 rounded-lg"
-        >
-          Reports
-        </Link>
+      // dropdown options
+      setRegions(analyticsData.regions || []);
+      setCategories(analyticsData.categories || []);
 
-      </div>
+      // monthly chart
+      setChartData(
+        Object.entries(analyticsData.monthly_sales || {}).map(
+          ([month, sales]) => ({
+            month,
+            sales,
+          })
+        )
+      );
 
-      <div className="flex gap-4 mb-8">
+      // product chart
+      setProductData(
+        Object.entries(analyticsData.top_products || {}).map(
+          ([name, value]) => ({
+            name,
+            value,
+          })
+        )
+      );
 
-        <input
-          type="number"
-          placeholder="Enter Dataset ID"
-          className="border p-3 rounded w-64"
-          value={datasetId}
-          onChange={(e) =>
-            setDatasetId(e.target.value)
-          }
-        />
+        } catch (error) {
+    console.error(error);
+    alert("Failed to load dashboard");
+  } finally {
+    setLoading(false);
+  }
+};
 
-        <button
-          onClick={handleLoadDashboard}
-          className="bg-purple-600 text-white px-6 rounded"
-        >
-          Load Analytics
-        </button>
+const pieColors = [
+  "#3B82F6",
+  "#8B5CF6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+];
 
-      </div>
+return (
+  <div className="flex min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-purple-100">
+    <Sidebar />
 
-      {analytics && (
+    <div className="flex-1">
+      <Navbar />
 
-        <>
+      <div className="p-6 md:p-10">
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-
-            <div className="bg-white p-6 rounded-xl shadow">
-
-              <h2 className="text-lg font-semibold">
-                Total Sales
-              </h2>
-
-              <p className="text-2xl mt-4">
-                ₹{analytics.total_sales}
-              </p>
-
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow">
-
-              <h2 className="text-lg font-semibold">
-                Total Orders
-              </h2>
-
-              <p className="text-2xl mt-4">
-                {analytics.total_orders}
-              </p>
-
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow">
-
-              <h2 className="text-lg font-semibold">
-                Top Product
-              </h2>
-
-              <p className="text-2xl mt-4">
-
-                {
-                  Object.keys(
-                    analytics.top_products
-                  )[0]
-                }
-
-              </p>
-
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow">
-
-              <h2 className="text-lg font-semibold">
-                Product Count
-              </h2>
-
-              <p className="text-2xl mt-4">
-
-                {
-                  Object.keys(
-                    analytics.top_products
-                  ).length
-                }
-
-              </p>
-
-            </div>
-
+        {/* HEADER */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+          <div>
+            <h1 className="text-4xl font-black text-gray-800">
+              AI Forecast Dashboard
+            </h1>
+            <p className="text-gray-500 mt-2">
+              Filters: ID + Region + Category + Date Range
+            </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow">
+          <div className="flex gap-3 flex-wrap">
+            <Link to="/upload" className="bg-blue-600 text-white px-5 py-3 rounded-2xl">
+              Upload
+            </Link>
+            <Link to="/forecast" className="bg-green-600 text-white px-5 py-3 rounded-2xl">
+              Forecast
+            </Link>
+            <Link to="/reports" className="bg-red-500 text-white px-5 py-3 rounded-2xl">
+              Reports
+            </Link>
+          </div>
+        </div>
+      </div>
+      
+        {/* FILTER PANEL */}
+        <div className="bg-white/70 backdrop-blur-lg p-6 rounded-3xl shadow mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
-            <h2 className="text-2xl font-bold mb-6">
-              Monthly Sales Trends
-            </h2>
+            <input
+              type="number"
+              placeholder="Dataset ID"
+              value={datasetId}
+              onChange={(e) => setDatasetId(e.target.value)}
+              className="border p-3 rounded-xl"
+            />
 
-            <div className="h-96">
-
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
+            
+              <select
+                value={selectedRegion}
+                onChange={(e) => setSelectedRegion(e.target.value)}
+                className="border p-3 rounded-xl"
               >
+                <option value="">All Regions</option>
 
-                <BarChart data={chartData}>
+                {regions.length > 0 ? (
+                  regions.map((r, i) => (
+                    <option key={i} value={r}>
+                      {r}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No regions available
+                  </option>
+                )}
+              </select>
+              
 
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                  />
+            
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="border p-3 rounded-xl"
+              >
+                <option value="">All Categories</option>
 
-                  <XAxis dataKey="month" />
+                {categories.length > 0 ? (
+                  categories.map((c, i) => (
+                    <option key={i} value={c}>
+                      {c}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No categories available
+                  </option>
+                )}
+              </select>
+            
 
-                  <YAxis />
+        {/* START DATE */}
+        <div className="flex flex-col">
+          <label className="text-sm font-semibold text-gray-600 mb-1">
+            Start Date
+          </label>
 
-                  <Tooltip />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="border p-3 rounded-xl"
+          />
+        </div>
 
-                  <Bar
-                    dataKey="sales"
-                    fill="#7c3aed"
-                  />
+        {/* END DATE */}
+        <div className="flex flex-col">
+          <label className="text-sm font-semibold text-gray-600 mb-1">
+            End Date
+          </label>
 
-                </BarChart>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="border p-3 rounded-xl"
+          />
+        </div>
 
-              </ResponsiveContainer>
+          <div className="mt-4">
+            <button
+              onClick={handleLoadDashboard}
+              className="bg-purple-600 text-white px-8 py-3 rounded-2xl"
+            >
+              Load Analytics
+            </button>
+          </div>
+        </div>
 
+        {/* LOADING */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        )}
+
+        {/* ANALYTICS */}
+        {!loading && analytics && (
+          <>
+            {/* KPI */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+              <div className="bg-white p-6 rounded-3xl shadow">
+                <h2>Total Sales</h2>
+                <p className="text-2xl font-bold">₹{analytics.total_sales}</p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl shadow">
+                <h2>Total Orders</h2>
+                <p className="text-2xl font-bold">{analytics.total_orders}</p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl shadow">
+                <h2>Top Product</h2>
+                <p className="text-2xl font-bold">
+                  {Object.keys(analytics.top_products || {})[0]}
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl shadow">
+                <h2>Products</h2>
+                <p className="text-2xl font-bold">
+                  {Object.keys(analytics.top_products || {}).length}
+                </p>
+              </div>
             </div>
 
-          </div>
+            {/* BAR + PIE */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-10">
+              <div className="bg-white p-6 rounded-3xl shadow">
+                <h2 className="text-xl font-bold mb-4">Monthly Sales</h2>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="sales" fill="#7c3aed" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
 
-        </>
-      )}
+              <div className="bg-white p-6 rounded-3xl shadow">
+                <h2 className="text-xl font-bold mb-4">Product Distribution</h2>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={productData}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={100}
+                      label
+                    >
+                      {productData.map((_, i) => (
+                        <Cell key={i} fill={pieColors[i % pieColors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </>
+        )}
 
+      </div>
     </div>
-  </>
-  );
+  </div>
+);
 }

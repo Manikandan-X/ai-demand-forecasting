@@ -22,9 +22,12 @@ class Forecast(Base):
 
     dataset_id = Column(
         Integer,
-        ForeignKey("datasets.id")
+        ForeignKey("datasets.id"),
+        index=True
     )
-
+    
+    
+    
     predicted_value = Column(
         Float,
         nullable=False
@@ -35,6 +38,11 @@ class Forecast(Base):
         nullable=False
     )
 
+    model_used = Column(
+        String(100),
+        index=True
+    )
+    
     created_at = Column(
         DateTime,
         default=datetime.utcnow

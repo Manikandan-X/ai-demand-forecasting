@@ -74,6 +74,7 @@ def login_user(
     ).first()
 
     if not existing_user:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
@@ -85,6 +86,7 @@ def login_user(
     )
 
     if not valid_password:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
@@ -98,7 +100,14 @@ def login_user(
 
     return {
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+
+        "user": {
+            "id": existing_user.id,
+            "name": existing_user.name,
+            "email": existing_user.email,
+            "role": existing_user.role
+        }
     }
     
 @router.get("/me")
