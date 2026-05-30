@@ -9,7 +9,7 @@ API.interceptors.request.use(
   (config) => {
 
     const token =
-      localStorage.getItem(
+      sessionStorage.getItem(
         "token"
       );
 

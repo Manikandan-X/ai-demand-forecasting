@@ -152,14 +152,26 @@ export default function ForecastHistory() {
                       try {
 
                         let result =
-                            item.forecast_result;
+                          item.forecast_result;
 
-                        // convert single quotes to double quotes
+                        if (!result) {
+                          return [];
+                        }
+
+                        // already object
+                        if (
+                          typeof result ===
+                          "object"
+                        ) {
+                          return result;
+                        }
+
+                        // string fix
                         result =
-                            result.replace(
-                              /'/g,
-                              '"'
-                            );
+                          result.replace(
+                            /'/g,
+                            '"'
+                          );
 
                         return JSON.parse(
                           result

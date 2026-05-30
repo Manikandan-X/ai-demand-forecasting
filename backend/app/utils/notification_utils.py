@@ -10,19 +10,30 @@ from app.routers.websocket import (
 
 
 async def create_notification(
+
     db: Session,
+
     title: str,
+
     message: str,
+
     user_id: int = None,
+
     notification_type: str = "general",
+
     is_admin: bool = False
 ):
 
     notification = Notification(
+
         user_id=user_id,
+
         title=title,
+
         message=message,
+
         notification_type=notification_type,
+
         is_admin=is_admin
     )
 
@@ -33,7 +44,10 @@ async def create_notification(
     db.refresh(notification)
 
     await send_notification_to_clients(
-        message
+
+        message=message,
+
+        user_id=user_id
     )
 
     return notification

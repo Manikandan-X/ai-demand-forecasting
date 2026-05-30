@@ -24,22 +24,32 @@ export default function Login() {
   useEffect(() => {
 
     const token =
-      localStorage.getItem(
+      sessionStorage.getItem(
         "token"
       );
 
     if (token) {
 
-      const user =
-        JSON.parse(
-          localStorage.getItem(
-            "user"
-          )
-        );
+      const user = (() => {
+
+        try {
+
+          return JSON.parse(
+            sessionStorage.getItem(
+              "user"
+            )
+          );
+
+        } catch {
+
+          return null;
+        }
+
+      })();
 
       if (
         user?.role ===
-        "admin"
+        "super_admin"
       ) {
 
         navigate("/admin");
@@ -73,13 +83,13 @@ export default function Login() {
         const user =
           response.data.user;
 
-        localStorage.setItem(
+        sessionStorage.setItem(
           "token",
           response.data
             .access_token
         );
 
-        localStorage.setItem(
+        sessionStorage.setItem(
           "user",
           JSON.stringify(
             user
@@ -88,7 +98,21 @@ export default function Login() {
 
         if (
           user.role ===
-          "admin"
+          "super_admin"
+        ) {
+
+          navigate(
+            "/admin"
+          );
+
+        } else {
+
+          navigate(
+            "/dashboard"
+          );
+        }if (
+          user.role ===
+          "super_admin"
         ) {
 
           navigate(

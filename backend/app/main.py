@@ -2,6 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from contextlib import asynccontextmanager
+
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.inmemory import (
+    InMemoryBackend
+)
+
 from app.db.base import Base
 from app.db.session import engine
 
@@ -19,12 +26,27 @@ from app.routers.websocket import router as websocket_router
 
 from app.core.exception_handler import global_exception_handler
 
+from app.core.api_monitoring import (
+    ApiMonitoringMiddleware
+)
+
 Base.metadata.create_all(bind=engine)
+
+@asynccontextmanager
+async def lifespan(app):
+
+    FastAPICache.init(
+        InMemoryBackend()
+    )
+
+    yield
+
 
 app = FastAPI(
     title="AI Demand Forecasting API",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 app.add_exception_handler(Exception, global_exception_handler)
@@ -42,6 +64,9 @@ app.add_middleware(
     minimum_size=1000
 )
 
+app.add_middleware(
+    ApiMonitoringMiddleware
+)
 # =====================
 # ROUTES (CLEAN)
 # =====================

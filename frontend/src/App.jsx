@@ -5,98 +5,95 @@ import {
 } from "react-router-dom";
 
 import Login from "./pages/Login";
-
 import Register from "./pages/Register";
-
 import Dashboard from "./pages/Dashboard";
+import UploadDataset from "./pages/UploadDataset";
+import Forecast from "./pages/Forecast";
+import Reports from "./pages/Reports";
+import ForecastHistory from "./pages/ForecastHistory";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 
-import UploadDataset from "./pages/UploadDataset";
-
-import Forecast from "./pages/Forecast";
-
-import Reports from "./pages/Reports";
-
-import ForecastHistory from "./pages/ForecastHistory";
-
-import AdminDashboard from "./pages/AdminDashboard";
+import ThemeProvider from "./context/ThemeProvider";
 
 function App() {
-
   return (
-    <BrowserRouter>
+    <ThemeProvider>
 
-      <Routes>
+      <BrowserRouter>
+        <Routes>
 
-        <Route
-          path="/"
-          element={<Login />}
-        />
+          <Route
+            path="/"
+            element={<Login />}
+          />
 
-        <Route
-          path="/register"
-          element={<Register />}
-        />
+          <Route
+            path="/register"
+            element={<Register />}
+          />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/upload"
-          element={
-            <ProtectedRoute>
-              <UploadDataset />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/upload"
+            element={
+              <ProtectedRoute>
+                <UploadDataset />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/forecast"
-          element={
-            <ProtectedRoute>
-              <Forecast />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/forecast"
+            element={
+              <ProtectedRoute>
+                <Forecast />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/forecast-history"
-          element={
-            <ProtectedRoute>
-              <ForecastHistory />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/forecast-history"
+            element={
+              <ProtectedRoute>
+                <ForecastHistory />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <Reports />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <Reports />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute
-              adminOnly={true}
-            >
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute
+                adminOnly={true}
+              >
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+
+    </ThemeProvider>
   );
 }
 

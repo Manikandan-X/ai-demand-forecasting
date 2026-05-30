@@ -12,8 +12,8 @@ from app.models.notification import (
 
 from app.models.user import User
 
-from app.core.dependencies import (
-    get_current_user
+from app.core.rbac import (
+    analyst_or_viewer_required
 )
 
 router = APIRouter(
@@ -22,76 +22,14 @@ router = APIRouter(
 )
 
 
+# =========================
 # GET ALL NOTIFICATIONS
+# =========================
 @router.get("/")
 async def get_notifications(
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        get_current_user
-    )
-):
-
-    if current_user.role == "admin":
-
-        notifications = db.query(
-            Notification
-        ).order_by(
-            Notification.created_at.desc()
-        ).all()
-
-    else:
-
-        notifications = db.query(
-            Notification
-        ).filter(
-            Notification.user_id ==
-            current_user.id
-        ).order_by(
-            Notification.created_at.desc()
-        ).all()
-
-    return notifications
-
-
-# GET UNREAD COUNT
-@router.get("/unread-count")
-async def unread_count(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_user
-    )
-):
-
-    if current_user.role == "admin":
-
-        count = db.query(
-            Notification
-        ).filter(
-            Notification.is_read == False
-        ).count()
-
-    else:
-
-        count = db.query(
-            Notification
-        ).filter(
-            Notification.user_id ==
-            current_user.id,
-
-            Notification.is_read == False
-        ).count()
-
-    return {
-        "unread_count": count
-    }
-
-
-# MARK ALL AS READ
-@router.put("/mark-all/read")
-async def mark_all_read(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_user
+        analyst_or_viewer_required
     )
 ):
 
@@ -99,18 +37,92 @@ async def mark_all_read(
         Notification
     )
 
-    if current_user.role != "admin":
+    # super admin sees all
+    if (
+        current_user.role
+        != "super_admin"
+    ):
 
         query = query.filter(
-            Notification.user_id ==
-            current_user.id
+            Notification.user_id
+            == current_user.id
         )
 
-    notifications = query.filter(
-        Notification.is_read == False
+    notifications = query.order_by(
+        Notification.created_at.desc()
     ).all()
 
+    return notifications
+
+
+# =========================
+# GET UNREAD COUNT
+# =========================
+@router.get("/unread-count")
+async def unread_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        analyst_or_viewer_required
+    )
+):
+
+    query = db.query(
+        Notification
+    ).filter(
+        Notification.is_read == False
+    )
+
+    # super admin sees all
+    if (
+        current_user.role
+        != "super_admin"
+    ):
+
+        query = query.filter(
+            Notification.user_id
+            == current_user.id
+        )
+
+    count = query.count()
+
+    return {
+        "unread_count":
+        count
+    }
+
+
+# =========================
+# MARK ALL AS READ
+# =========================
+@router.put("/mark-all/read")
+async def mark_all_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        analyst_or_viewer_required
+    )
+):
+
+    query = db.query(
+        Notification
+    ).filter(
+        Notification.is_read == False
+    )
+
+    # super admin sees all
+    if (
+        current_user.role
+        != "super_admin"
+    ):
+
+        query = query.filter(
+            Notification.user_id
+            == current_user.id
+        )
+
+    notifications = query.all()
+
     for item in notifications:
+
         item.is_read = True
 
     db.commit()
@@ -121,28 +133,38 @@ async def mark_all_read(
     }
 
 
-# MARK SINGLE NOTIFICATION AS READ
-@router.put("/{notification_id}/read")
+# =========================
+# MARK SINGLE AS READ
+# =========================
+@router.put(
+    "/{notification_id}/read"
+)
 async def mark_as_read(
     notification_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        get_current_user
+        analyst_or_viewer_required
     )
 ):
 
     query = db.query(
         Notification
     ).filter(
-        Notification.id ==
-        notification_id
+        Notification.id
+        == notification_id
     )
 
-    if current_user.role != "admin":
+    # prevent other users
+    # reading someone else's
+    # notification
+    if (
+        current_user.role
+        != "super_admin"
+    ):
 
         query = query.filter(
-            Notification.user_id ==
-            current_user.id
+            Notification.user_id
+            == current_user.id
         )
 
     notification = query.first()
@@ -151,7 +173,10 @@ async def mark_as_read(
 
         raise HTTPException(
             status_code=404,
-            detail="Notification not found"
+            detail=(
+                "Notification "
+                "not found"
+            )
         )
 
     notification.is_read = True

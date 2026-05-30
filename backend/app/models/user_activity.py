@@ -1,7 +1,6 @@
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
-from sqlalchemy import Boolean
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
 
@@ -12,9 +11,9 @@ from datetime import datetime
 from app.db.base import Base
 
 
-class Notification(Base):
+class UserActivity(Base):
 
-    __tablename__ = "notifications"
+    __tablename__ = "user_activity_logs"
 
     id = Column(
         Integer,
@@ -29,30 +28,15 @@ class Notification(Base):
         index=True
     )
 
-    title = Column(
-        String(255)
-    )
-
-    message = Column(
-        String(1000)
-    )
-
-    notification_type = Column(
-        String(100),
-        default="general",
+    action = Column(
+        String(255),
+        nullable=False,
         index=True
     )
 
-    is_admin = Column(
-        Boolean,
-        default=False,
-        index=True
-    )
-
-    is_read = Column(
-        Boolean,
-        default=False,
-        index=True
+    details = Column(
+        String(1000),
+        nullable=True
     )
 
     created_at = Column(
@@ -62,6 +46,5 @@ class Notification(Base):
     )
 
     user = relationship(
-        "User",
-        back_populates="notifications"
+        "User"
     )

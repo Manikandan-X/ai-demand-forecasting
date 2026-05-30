@@ -52,10 +52,15 @@ export default function Register() {
       items-center
       justify-center
       bg-gradient-to-br
-      from-slate-950
-      via-indigo-950
-      to-slate-900
+      from-slate-100
+      via-blue-50
+      to-purple-100
+      dark:from-slate-950
+      dark:via-indigo-950
+      dark:to-slate-900
       p-6
+      transition-colors
+      duration-300
       "
     >
 
@@ -64,12 +69,16 @@ export default function Register() {
         w-full
         max-w-md
         backdrop-blur-xl
-        bg-white/10
+        bg-white/80
+        dark:bg-white/10
         border
-        border-white/20
+        border-gray-200
+        dark:border-white/20
         rounded-[30px]
         p-8
         shadow-2xl
+        transition-colors
+        duration-300
         "
       >
 
@@ -79,13 +88,20 @@ export default function Register() {
             className="
             text-4xl
             font-bold
-            text-white
+            text-gray-800
+            dark:text-white
             "
           >
             Create Account
           </h1>
 
-          <p className="text-gray-300 mt-2">
+          <p
+            className="
+            text-gray-600
+            dark:text-gray-300
+            mt-2
+            "
+          >
             Register for AI Forecasting
           </p>
 
@@ -101,16 +117,22 @@ export default function Register() {
             placeholder="Full Name"
             className="
             w-full
-            bg-white/10
+            bg-white
+            dark:bg-white/10
             border
-            border-gray-500
-            text-white
-            placeholder-gray-300
+            border-gray-300
+            dark:border-gray-500
+            text-gray-800
+            dark:text-white
+            placeholder-gray-500
+            dark:placeholder-gray-300
             p-4
             rounded-2xl
             outline-none
             focus:ring-2
             focus:ring-indigo-500
+            transition-colors
+            duration-300
             "
             value={name}
             onChange={(e) =>
@@ -123,16 +145,22 @@ export default function Register() {
             placeholder="Email Address"
             className="
             w-full
-            bg-white/10
+            bg-white
+            dark:bg-white/10
             border
-            border-gray-500
-            text-white
-            placeholder-gray-300
+            border-gray-300
+            dark:border-gray-500
+            text-gray-800
+            dark:text-white
+            placeholder-gray-500
+            dark:placeholder-gray-300
             p-4
             rounded-2xl
             outline-none
             focus:ring-2
             focus:ring-indigo-500
+            transition-colors
+            duration-300
             "
             value={email}
             onChange={(e) =>
@@ -145,16 +173,22 @@ export default function Register() {
             placeholder="Password"
             className="
             w-full
-            bg-white/10
+            bg-white
+            dark:bg-white/10
             border
-            border-gray-500
-            text-white
-            placeholder-gray-300
+            border-gray-300
+            dark:border-gray-500
+            text-gray-800
+            dark:text-white
+            placeholder-gray-500
+            dark:placeholder-gray-300
             p-4
             rounded-2xl
             outline-none
             focus:ring-2
             focus:ring-indigo-500
+            transition-colors
+            duration-300
             "
             value={password}
             onChange={(e) =>
@@ -187,7 +221,8 @@ export default function Register() {
         <p
           className="
           text-center
-          text-gray-300
+          text-gray-600
+          dark:text-gray-300
           mt-6
           "
         >
@@ -196,7 +231,8 @@ export default function Register() {
           <Link
             to="/"
             className="
-            text-indigo-400
+            text-indigo-600
+            dark:text-indigo-400
             font-semibold
             ml-1
             "
@@ -211,3 +247,4 @@ export default function Register() {
     </div>
   );
 }
+

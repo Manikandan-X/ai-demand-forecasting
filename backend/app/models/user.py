@@ -1,6 +1,7 @@
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
+
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -18,7 +19,8 @@ class User(Base):
 
     name = Column(
         String(100),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     email = Column(
@@ -33,10 +35,14 @@ class User(Base):
         nullable=False
     )
 
-    # NEW
+    # ENTERPRISE ROLES
+    # super_admin
+    # analyst
+    # viewer
     role = Column(
         String(50),
-        default="user"
+        default="viewer",
+        index=True
     )
 
     # RELATIONSHIPS

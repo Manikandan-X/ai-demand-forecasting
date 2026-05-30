@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
-
+from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session
-
+from sqlalchemy import func
 from app.db.deps import get_db
 
 from app.models.user import User
@@ -12,12 +12,28 @@ from app.models.forecast_history import ForecastHistory
 from app.models.admin_activity import AdminActivity
 from app.models.forecast import Forecast
 
-from app.core.admin_dependencies import (
-    admin_required
+from app.core.rbac import (
+    super_admin_required
 )
 
 from app.core.dependencies import (
     get_current_user
+)
+
+from app.core.rbac import (
+    super_admin_required
+)
+
+from app.core.admin_dependencies import (
+    admin_required
+)
+
+from app.utils.activity_logger import (
+    log_user_activity
+)
+
+from app.models.user_activity import (
+    UserActivity
 )
 
 router = APIRouter(
@@ -28,9 +44,12 @@ router = APIRouter(
 
 # ADMIN DASHBOARD
 @router.get("/dashboard")
+# @cache(expire=60)
 async def admin_dashboard(
     db: Session = Depends(get_db),
-    admin: User = Depends(admin_required)
+    _: User = Depends(
+    super_admin_required
+    )
 ):
 
     total_users = db.query(User).count()
@@ -60,74 +79,170 @@ async def admin_dashboard(
 # GET ALL USERS
 @router.get("/users")
 async def get_all_users(
+
+    page: int = 1,
+
+    limit: int = 20,
+
     db: Session = Depends(get_db),
-    admin: User = Depends(admin_required)
+
+    admin: User = Depends(
+        super_admin_required
+    )
 ):
 
-    users = db.query(User).all()
+    skip = (
+        page - 1
+    ) * limit
 
-    return users
+    total = db.query(
+        User
+    ).count()
+
+    users = db.query(
+        User
+    ).offset(skip).limit(
+        limit
+    ).all()
+
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "users": users
+    }
 
 
 # GET ALL DATASETS
 @router.get("/datasets")
 async def get_all_datasets(
+
+    page: int = 1,
+
+    limit: int = 20,
+
     db: Session = Depends(get_db),
-    admin: User = Depends(admin_required)
+
+    admin: User = Depends(
+        super_admin_required
+    )
 ):
 
-    datasets = db.query(
+    skip = (
+        page - 1
+    ) * limit
+
+    query = db.query(
         Dataset
-    ).order_by(
+    )
+
+    total = query.count()
+
+    datasets = query.order_by(
         Dataset.created_at.desc()
+    ).offset(skip).limit(
+        limit
     ).all()
 
-    return datasets
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "datasets": datasets
+    }
 
 
 # GET FORECAST HISTORY
 @router.get("/forecasts")
 async def get_forecasts(
+
+    page: int = 1,
+
+    limit: int = 20,
+
     db: Session = Depends(get_db),
-    admin: User = Depends(admin_required)
+
+    admin: User = Depends(
+        super_admin_required
+    )
 ):
 
-    forecasts = db.query(
+    skip = (
+        page - 1
+    ) * limit
+
+    query = db.query(
         ForecastHistory
-    ).order_by(
+    )
+
+    total = query.count()
+
+    forecasts = query.order_by(
         ForecastHistory.created_at.desc()
+    ).offset(skip).limit(
+        limit
     ).all()
 
-    return forecasts
-
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "forecasts": forecasts
+    }
 
 # GET REPORTS
 @router.get("/reports")
 async def get_reports(
 
+    page: int = 1,
+
+    limit: int = 20,
+
     db: Session = Depends(get_db),
 
     admin: User = Depends(
-        admin_required
+        super_admin_required
     )
 ):
 
-    reports = db.query(
+    skip = (
+        page - 1
+    ) * limit
+
+    query = db.query(
         ForecastHistory
-    ).order_by(
+    )
+
+    total = query.count()
+
+    reports = query.order_by(
         ForecastHistory.created_at.desc()
+    ).offset(skip).limit(
+        limit
     ).all()
 
-    return reports
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "reports": reports
+    }
 
 # SYSTEM ANALYTICS
 @router.get("/analytics")
+# @cache(expire=60)
 async def system_analytics(
+
     db: Session = Depends(get_db),
-    admin: User = Depends(admin_required)
+
+    admin: User = Depends(
+        super_admin_required
+    )
 ):
 
-    total_users = db.query(User).count()
+    total_users = db.query(
+        User
+    ).count()
 
     total_datasets = db.query(
         Dataset
@@ -137,36 +252,37 @@ async def system_analytics(
         ForecastHistory
     ).count()
 
-    avg_accuracy = db.query(
-        ForecastHistory
-    ).all()
+    average_accuracy = db.query(
+        func.avg(
+            ForecastHistory.accuracy
+        )
+    ).scalar()
 
-    accuracy_list = []
-
-    for item in avg_accuracy:
-
-        if item.accuracy:
-
-            accuracy_list.append(
-                item.accuracy
-            )
-
-    average_accuracy = 0
-
-    if accuracy_list:
+    if average_accuracy:
 
         average_accuracy = round(
-            sum(accuracy_list)
-            /
-            len(accuracy_list),
+            float(
+                average_accuracy
+            ),
             2
         )
 
+    else:
+
+        average_accuracy = 0
+
     return {
-        "users": total_users,
-        "datasets": total_datasets,
-        "forecasts": total_forecasts,
-        "average_accuracy": average_accuracy
+        "users":
+        total_users,
+
+        "datasets":
+        total_datasets,
+
+        "forecasts":
+        total_forecasts,
+
+        "average_accuracy":
+        average_accuracy
     }
     
 @router.delete("/users/{user_id}")
@@ -200,6 +316,16 @@ async def delete_user(
             status_code=400,
             detail="Admin cannot delete own account"
         )
+    
+    log_user_activity(
+        db=db,
+        user_id=current_user.id,
+        action="USER_DELETED",
+        details=(
+            f"Deleted user "
+            f"{user.email}"
+        )
+    )    
 
     db.delete(user)
 
@@ -243,6 +369,15 @@ async def delete_dataset(
         Forecast.dataset_id == dataset.id
     ).delete()
 
+    log_user_activity(
+        db=db,
+        user_id=current_user.id,
+        action="DATASET_DELETED",
+        details=(
+            f"Deleted dataset "
+            f"{dataset.filename}"
+        )
+    )
     # Delete dataset
     db.delete(dataset)
 
@@ -295,8 +430,9 @@ async def update_user_role(
         )
 
     if body.role not in [
-        "admin",
-        "user"
+        "super_admin",
+        "analyst",
+        "viewer"
     ]:
 
         raise HTTPException(
@@ -305,6 +441,17 @@ async def update_user_role(
         )
 
     user.role = body.role
+    
+    log_user_activity(
+        db=db,
+        user_id=current_user.id,
+        action="ROLE_UPDATED",
+        details=(
+            f"{user.email} "
+            f"changed to "
+            f"{body.role}"
+        )
+    )   
 
     db.commit()
 
@@ -313,4 +460,110 @@ async def update_user_role(
     return {
         "message":
         f"User role updated to {body.role}"
+    }
+    
+@router.get("/activity-logs")
+# @cache(expire=60)
+async def get_activity_logs(
+
+    page: int = 1,
+
+    limit: int = 20,
+
+    action: str = None,
+
+    user_id: int = None,
+
+    db: Session = Depends(get_db),
+
+    current_user: User = Depends(
+        super_admin_required
+    )
+):
+
+    skip = (
+        page - 1
+    ) * limit
+
+    query = db.query(
+        UserActivity
+    )
+
+    if action:
+
+        query = query.filter(
+            UserActivity.action == action
+        )
+
+    if user_id:
+
+        query = query.filter(
+            UserActivity.user_id ==
+            user_id
+        )
+
+    total = query.count()
+
+    logs = query.order_by(
+        UserActivity.created_at.desc()
+    ).offset(skip).limit(limit).all()
+
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "logs": logs
+    }
+    
+@router.get("/system-monitoring")
+# @cache(expire=60)
+async def system_monitoring(
+
+    db: Session = Depends(get_db),
+
+    current_user: User = Depends(
+        super_admin_required
+    )
+):
+
+    total_logs = db.query(
+        UserActivity
+    ).count()
+
+    total_api_requests = db.query(
+        UserActivity
+    ).filter(
+        UserActivity.action ==
+        "API_REQUEST"
+    ).count()
+
+    total_forecasts = db.query(
+        ForecastHistory
+    ).count()
+
+    total_users = db.query(
+        User
+    ).count()
+
+    latest_activities = db.query(
+        UserActivity
+    ).order_by(
+        UserActivity.created_at.desc()
+    ).limit(10).all()
+
+    return {
+        "total_logs":
+        total_logs,
+
+        "total_api_requests":
+        total_api_requests,
+
+        "total_forecasts":
+        total_forecasts,
+
+        "total_users":
+        total_users,
+
+        "latest_activities":
+        latest_activities
     }

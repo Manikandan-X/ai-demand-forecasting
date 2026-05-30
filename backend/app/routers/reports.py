@@ -14,8 +14,8 @@ from app.db.deps import get_db
 from app.models.dataset import Dataset
 from app.models.user import User
 
-from app.core.dependencies import (
-    get_current_user
+from app.core.rbac import (
+    analyst_or_viewer_required
 )
 
 from app.services.report_service import (
@@ -27,13 +27,23 @@ from app.utils.notification_utils import (
     create_notification
 )
 
+from app.utils.activity_logger import (
+    log_user_activity
+)
+
+from app.routers.websocket import (
+    send_dashboard_update
+)
+
 router = APIRouter(
     prefix="/reports",
     tags=["Reports"]
 )
 
 
+# ==========================
 # BACKGROUND TASK
+# ==========================
 def log_report_generation():
 
     print(
@@ -41,20 +51,35 @@ def log_report_generation():
     )
 
 
+# ==========================
+# EXPORT EXCEL REPORT
+# ==========================
 @router.get("/excel/{dataset_id}")
 async def export_excel_report(
 
     dataset_id: int,
 
-    background_tasks: BackgroundTasks,
+    background_tasks:
+    BackgroundTasks,
 
-    db: Session = Depends(get_db),
+    db: Session = Depends(
+        get_db
+    ),
 
-    current_user: User = Depends(get_current_user)
+    current_user: User =
+    Depends(
+        analyst_or_viewer_required
+    )
 ):
 
-    dataset = db.query(Dataset).filter(
-        Dataset.id == dataset_id
+    dataset = db.query(
+        Dataset
+    ).filter(
+        Dataset.id ==
+        dataset_id,
+
+        Dataset.uploaded_by ==
+        current_user.id
     ).first()
 
     if not dataset:
@@ -64,7 +89,9 @@ async def export_excel_report(
             detail="Dataset not found"
         )
 
-    if dataset.file_path.endswith(".csv"):
+    if dataset.file_path.endswith(
+        ".csv"
+    ):
 
         df = pd.read_csv(
             dataset.file_path
@@ -76,24 +103,43 @@ async def export_excel_report(
             dataset.file_path
         )
 
-    report_path = generate_excel_report(
-
-        df,
-
-        f"dataset_{dataset_id}.xlsx"
+    report_path = (
+        generate_excel_report(
+            df,
+            f"dataset_{dataset_id}.xlsx"
+        )
     )
 
-    
+    log_user_activity(
+        db=db,
+        user_id=current_user.id,
+        action=
+        "REPORT_EXCEL_DOWNLOAD",
+        details=(
+            f"Excel report "
+            f"downloaded for "
+            f"{dataset.filename}"
+        )
+    )
+
     await create_notification(
         db=db,
-        title="Report Generated",
-        message="Reports are generated",
-        user_id=current_user.id,
-        notification_type="report",
-        is_admin=True
+        title=
+        "Report Generated",
+        message=
+        "Excel report generated successfully",
+        user_id=
+        current_user.id,
+        notification_type=
+        "report",
+        is_admin=False
     )
-    
-    # BACKGROUND TASK
+
+    await send_dashboard_update(
+        user_id=
+        current_user.id
+    )
+
     background_tasks.add_task(
         log_report_generation
     )
@@ -102,26 +148,49 @@ async def export_excel_report(
 
         path=report_path,
 
-        filename=f"dataset_{dataset_id}.xlsx",
+        filename=(
+            f"dataset_"
+            f"{dataset_id}.xlsx"
+        ),
 
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        media_type=(
+            "application/"
+            "vnd.openxmlformats-"
+            "officedocument."
+            "spreadsheetml.sheet"
+        )
     )
 
 
+# ==========================
+# EXPORT PDF REPORT
+# ==========================
 @router.get("/pdf/{dataset_id}")
 async def export_pdf_report(
 
     dataset_id: int,
 
-    background_tasks: BackgroundTasks,
+    background_tasks:
+    BackgroundTasks,
 
-    db: Session = Depends(get_db),
+    db: Session = Depends(
+        get_db
+    ),
 
-    current_user: User = Depends(get_current_user)
+    current_user: User =
+    Depends(
+        analyst_or_viewer_required
+    )
 ):
 
-    dataset = db.query(Dataset).filter(
-        Dataset.id == dataset_id
+    dataset = db.query(
+        Dataset
+    ).filter(
+        Dataset.id ==
+        dataset_id,
+
+        Dataset.uploaded_by ==
+        current_user.id
     ).first()
 
     if not dataset:
@@ -131,7 +200,9 @@ async def export_pdf_report(
             detail="Dataset not found"
         )
 
-    if dataset.file_path.endswith(".csv"):
+    if dataset.file_path.endswith(
+        ".csv"
+    ):
 
         df = pd.read_csv(
             dataset.file_path
@@ -143,24 +214,43 @@ async def export_pdf_report(
             dataset.file_path
         )
 
-    report_path = generate_pdf_report(
-
-        df,
-
-        f"dataset_{dataset_id}.pdf"
+    report_path = (
+        generate_pdf_report(
+            df,
+            f"dataset_{dataset_id}.pdf"
+        )
     )
 
-    
+    log_user_activity(
+        db=db,
+        user_id=current_user.id,
+        action=
+        "REPORT_PDF_DOWNLOAD",
+        details=(
+            f"PDF report "
+            f"downloaded for "
+            f"{dataset.filename}"
+        )
+    )
+
     await create_notification(
         db=db,
-        title="Report Generated",
-        message="Reports are generated",
-        user_id=current_user.id,
-        notification_type="report",
-        is_admin=True
+        title=
+        "Report Generated",
+        message=
+        "PDF report generated successfully",
+        user_id=
+        current_user.id,
+        notification_type=
+        "report",
+        is_admin=False
     )
-    
-    # BACKGROUND TASK
+
+    await send_dashboard_update(
+        user_id=
+        current_user.id
+    )
+
     background_tasks.add_task(
         log_report_generation
     )
@@ -169,7 +259,11 @@ async def export_pdf_report(
 
         path=report_path,
 
-        filename=f"dataset_{dataset_id}.pdf",
+        filename=(
+            f"dataset_"
+            f"{dataset_id}.pdf"
+        ),
 
-        media_type="application/pdf"
+        media_type=
+        "application/pdf"
     )

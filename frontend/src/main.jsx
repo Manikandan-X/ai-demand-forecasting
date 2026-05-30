@@ -4,13 +4,14 @@ import "./index.css";
 
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
+import ThemeProvider from "./context/ThemeProvider";
 
-ReactDOM.createRoot(
-  document.getElementById("root")
-).render(
-  <AuthProvider>
-    <NotificationProvider>
-      <App />
-    </NotificationProvider>
-  </AuthProvider>
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <ThemeProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <App />
+      </NotificationProvider>
+    </AuthProvider>
+  </ThemeProvider>
 );

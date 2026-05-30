@@ -6,13 +6,13 @@ export default function ProtectedRoute({
 }) {
 
   const token =
-    localStorage.getItem(
+    sessionStorage.getItem(
       "token"
     );
 
   const user =
     JSON.parse(
-      localStorage.getItem(
+      sessionStorage.getItem(
         "user"
       )
     );
@@ -25,10 +25,11 @@ export default function ProtectedRoute({
     );
   }
 
-  // ADMIN ROUTE CHECK
+  // SUPER ADMIN CHECK
   if (
     adminOnly &&
-    user?.role !== "admin"
+    user?.role !==
+      "super_admin"
   ) {
 
     return (

@@ -24,16 +24,19 @@ class ForecastHistory(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id"),
+        index=True
     )
 
     dataset_id = Column(
         Integer,
-        ForeignKey("datasets.id")
+        ForeignKey("datasets.id"),
+        index=True
     )
 
     model_name = Column(
-        String(100)
+        String(100),
+        index=True
     )
 
     accuracy = Column(
@@ -46,7 +49,9 @@ class ForecastHistory(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        index=True
+
     )
 
     user = relationship(

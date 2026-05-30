@@ -1,342 +1,344 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 
+import { Link } from "react-router-dom";
 import API from "../api/axios";
 
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import SkeletonCard from "../components/SkeletonCard";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  Legend,
-} from "recharts";
-
-import { motion } from "framer-motion";
+import DashboardStats from "../components/dashboard/DashboardStats";
+import SalesBarChart from "../components/dashboard/SalesBarChart";
+import ProductPieChart from "../components/dashboard/ProductPieChart";
+import AIInsights from "../components/dashboard/AIInsights";
 
 export default function Dashboard() {
-  // =========================
-  // STATE
-  // =========================
-  const [datasetId, setDatasetId] = useState("");
 
+  const [datasetId, setDatasetId] = useState("");
   const [analytics, setAnalytics] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [productData, setProductData] = useState([]);
-
   const [loading, setLoading] = useState(false);
 
-  // FILTERS
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const [selectedType, setSelectedType] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+
   const [selectedRegion, setSelectedRegion] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // DROPDOWN DATA
   const [regions, setRegions] = useState([]);
   const [categories, setCategories] = useState([]);
 
-  // =========================
-  // LOAD DASHBOARD (FIXED)
-  // =========================
-  const handleLoadDashboard = async () => {
-    if (!datasetId) {
-      alert("Please enter dataset ID");
-      return;
-    }
+  const socketRef = useRef(null);
+
+  const latestRef = useRef({
+    datasetId: "",
+    selectedRegion: "",
+    selectedCategory: "",
+    startDate: "",
+    endDate: "",
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(globalSearch);
+    }, 400);
+
+    return () => clearTimeout(t);
+  }, [globalSearch]);
+
+  useEffect(() => {
+    latestRef.current = {
+      datasetId,
+      selectedRegion,
+      selectedCategory,
+      startDate,
+      endDate,
+      selectedType,
+    };
+  }, [
+    datasetId,
+    selectedRegion,
+    selectedCategory,
+    startDate,
+    endDate,
+    selectedType,
+  ]);
+    const handleLoadDashboard = useCallback(async (overrideId) => {
+
+    const id = overrideId || latestRef.current.datasetId;
+    if (!id) return;
 
     try {
       setLoading(true);
 
-      // ✅ SAFE PARAMS OBJECT (FIXED)
       const params = {
-        id: datasetId,
+        id,
+        search: debouncedSearch,
+        type: selectedType,
       };
 
-      if (selectedRegion) {
-        params.region = selectedRegion;
-      }
+      if (latestRef.current.selectedRegion)
+        params.region = latestRef.current.selectedRegion;
 
-      if (selectedCategory) {
-        params.category = selectedCategory;
-      }
+      if (latestRef.current.selectedCategory)
+        params.category = latestRef.current.selectedCategory;
 
-      if (startDate) {
-        params.start_date = startDate;
-      }
+      if (latestRef.current.startDate)
+        params.start_date = latestRef.current.startDate;
 
-      if (endDate) {
-        params.end_date = endDate;
-      }
+      if (latestRef.current.endDate)
+        params.end_date = latestRef.current.endDate;
 
-      const response = await API.get(`/dashboard/${datasetId}`, {
-        params,
+      const res = await API.get(`/dashboard/${id}`, { params });
+
+      const data = res.data.analytics;
+
+      setAnalytics(data);
+      setRegions(data.regions || []);
+      setCategories(data.categories || []);
+
+      setChartData(
+        Object.entries(data.monthly_sales || {}).map(([m, s]) => ({
+          month: m,
+          sales: s,
+        }))
+      );
+
+      setProductData(
+        Object.entries(data.top_products || {}).map(([n, v]) => ({
+          name: n,
+          value: v,
+        }))
+      );
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load dashboard");
+    } finally {
+      setLoading(false);
+    }
+
+  }, [debouncedSearch, selectedType]);
+
+  const handleGlobalSearch = async () => {
+    try {
+      const res = await API.get("/dashboard/search", {
+        params: {
+          search: globalSearch.trim(),
+          type: selectedType,
+        },
       });
 
-      const analyticsData = response.data.analytics;
+      setSearchResults(res.data || []);
 
-      setAnalytics(analyticsData);
+    } catch (err) {
+      console.error(err);
+      alert("Search failed");
+    }
+  };
 
-      // dropdown options
-      setRegions(analyticsData.regions || []);
-      setCategories(analyticsData.categories || []);
+  const handleClearFilters = () => {
+    setDatasetId("");
+    setSelectedRegion("");
+    setSelectedCategory("");
+    setStartDate("");
+    setEndDate("");
+    setAnalytics(null);
+    setChartData([]);
+    setProductData([]);
+  };
+    return (
+    <div className="flex min-h-screen bg-gray-100 dark:bg-slate-950">
 
-      // monthly chart
-      setChartData(
-        Object.entries(analyticsData.monthly_sales || {}).map(
-          ([month, sales]) => ({
-            month,
-            sales,
-          })
-        )
-      );
+      <Sidebar />
 
-      // product chart
-      setProductData(
-        Object.entries(analyticsData.top_products || {}).map(
-          ([name, value]) => ({
-            name,
-            value,
-          })
-        )
-      );
+      <div className="flex-1">
+        <Navbar />
 
-        } catch (error) {
-    console.error(error);
-    alert("Failed to load dashboard");
-  } finally {
-    setLoading(false);
-  }
-};
+        <div className="p-6 md:p-10">
 
-const pieColors = [
-  "#3B82F6",
-  "#8B5CF6",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-];
+          {/* HEADER */}
+          <div className="flex justify-between flex-wrap gap-4 mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
+                AI Forecast Dashboard
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400">
+                Smart analytics dashboard
+              </p>
+            </div>
 
-return (
-  <div className="flex min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-purple-100">
-    <Sidebar />
-
-    <div className="flex-1">
-      <Navbar />
-
-      <div className="p-6 md:p-10">
-
-        {/* HEADER */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
-          <div>
-            <h1 className="text-4xl font-black text-gray-800">
-              AI Forecast Dashboard
-            </h1>
-            <p className="text-gray-500 mt-2">
-              Filters: ID + Region + Category + Date Range
-            </p>
+            <div className="flex gap-3">
+              <Link to="/upload" className="bg-blue-600 text-white px-4 py-2 rounded-xl">
+                Upload
+              </Link>
+              <Link to="/forecast" className="bg-green-600 text-white px-4 py-2 rounded-xl">
+                Forecast
+              </Link>
+              <Link to="/reports" className="bg-red-500 text-white px-4 py-2 rounded-xl">
+                Reports
+              </Link>
+            </div>
           </div>
 
-          <div className="flex gap-3 flex-wrap">
-            <Link to="/upload" className="bg-blue-600 text-white px-5 py-3 rounded-2xl">
-              Upload
-            </Link>
-            <Link to="/forecast" className="bg-green-600 text-white px-5 py-3 rounded-2xl">
-              Forecast
-            </Link>
-            <Link to="/reports" className="bg-red-500 text-white px-5 py-3 rounded-2xl">
-              Reports
-            </Link>
-          </div>
-        </div>
-      </div>
-      
-        {/* FILTER PANEL */}
-        <div className="bg-white/70 backdrop-blur-lg p-6 rounded-3xl shadow mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* GLOBAL SEARCH (FIXED BUTTON) */}
+          <div className="mb-6">
 
-            <input
-              type="number"
-              placeholder="Dataset ID"
-              value={datasetId}
-              onChange={(e) => setDatasetId(e.target.value)}
-              className="border p-3 rounded-xl"
-            />
+            <div className="grid md:grid-cols-2 gap-4">
+              <input
+                className="p-3 border rounded-xl dark:bg-slate-900 dark:text-white"
+                placeholder="Search..."
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+              />
 
-            
               <select
+                className="p-3 border rounded-xl dark:bg-slate-900 dark:text-white"
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+              >
+                <option value="">All</option>
+                <option value="dataset">Dataset</option>
+                <option value="forecast">Forecast</option>
+                <option value="report">Report</option>
+                <option value="user">User</option>
+              </select>
+            </div>
+
+            {/* ✅ THIS IS YOUR MISSING BUTTON FIX */}
+            <button
+              onClick={handleGlobalSearch}
+              className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-xl hover:bg-blue-700"
+            >
+              Search
+            </button>
+
+          </div>
+
+          {/* SEARCH RESULTS */}
+          {searchResults.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl mb-6">
+              <h2 className="font-bold mb-3">Search Results</h2>
+
+              {searchResults.map((item) => (
+                <div key={item.id} className="border p-3 rounded-xl mb-2">
+                  <p><b>{item.name}</b></p>
+                  <p className="text-sm text-gray-500">{item.type}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* FILTERS */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl mb-6">
+
+            <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
+
+              <input
+                className="p-2 border rounded-xl dark:bg-slate-800 dark:text-white"
+                placeholder="Dataset ID"
+                value={datasetId}
+                onChange={(e) => setDatasetId(e.target.value)}
+              />
+
+              <select
+                className="p-2 border rounded-xl dark:bg-slate-800 dark:text-white"
                 value={selectedRegion}
                 onChange={(e) => setSelectedRegion(e.target.value)}
-                className="border p-3 rounded-xl"
               >
-                <option value="">All Regions</option>
-
-                {regions.length > 0 ? (
-                  regions.map((r, i) => (
-                    <option key={i} value={r}>
-                      {r}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>
-                    No regions available
-                  </option>
-                )}
+                <option value="">Region</option>
+                {regions.map((r, i) => (
+                  <option key={i}>{r}</option>
+                ))}
               </select>
-              
 
-            
               <select
+                className="p-2 border rounded-xl dark:bg-slate-800 dark:text-white"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="border p-3 rounded-xl"
               >
-                <option value="">All Categories</option>
-
-                {categories.length > 0 ? (
-                  categories.map((c, i) => (
-                    <option key={i} value={c}>
-                      {c}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>
-                    No categories available
-                  </option>
-                )}
+                <option value="">Category</option>
+                {categories.map((c, i) => (
+                  <option key={i}>{c}</option>
+                ))}
               </select>
-            
 
-        {/* START DATE */}
-        <div className="flex flex-col">
-          <label className="text-sm font-semibold text-gray-600 mb-1">
-            Start Date
-          </label>
+              <input type="date" className="p-2 border rounded-xl dark:bg-slate-800 dark:text-white"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
 
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="border p-3 rounded-xl"
-          />
-        </div>
+              <input type="date" className="p-2 border rounded-xl dark:bg-slate-800 dark:text-white"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
 
-        {/* END DATE */}
-        <div className="flex flex-col">
-          <label className="text-sm font-semibold text-gray-600 mb-1">
-            End Date
-          </label>
-
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="border p-3 rounded-xl"
-          />
-        </div>
-
-          <div className="mt-4">
-            <button
-              onClick={handleLoadDashboard}
-              className="bg-purple-600 text-white px-8 py-3 rounded-2xl"
-            >
-              Load Analytics
-            </button>
-          </div>
-        </div>
-
-        {/* LOADING */}
-        {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        )}
-
-        {/* ANALYTICS */}
-        {!loading && analytics && (
-          <>
-            {/* KPI */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-              <div className="bg-white p-6 rounded-3xl shadow">
-                <h2>Total Sales</h2>
-                <p className="text-2xl font-bold">₹{analytics.total_sales}</p>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl shadow">
-                <h2>Total Orders</h2>
-                <p className="text-2xl font-bold">{analytics.total_orders}</p>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl shadow">
-                <h2>Top Product</h2>
-                <p className="text-2xl font-bold">
-                  {Object.keys(analytics.top_products || {})[0]}
-                </p>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl shadow">
-                <h2>Products</h2>
-                <p className="text-2xl font-bold">
-                  {Object.keys(analytics.top_products || {}).length}
-                </p>
-              </div>
             </div>
 
-            {/* BAR + PIE */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-10">
-              <div className="bg-white p-6 rounded-3xl shadow">
-                <h2 className="text-xl font-bold mb-4">Monthly Sales</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="sales" fill="#7c3aed" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="flex gap-4 mt-4">
+              <button
+                onClick={() => handleLoadDashboard(datasetId)}
+                className="bg-purple-600 text-white px-6 py-2 rounded-xl"
+              >
+                Load Analytics
+              </button>
 
-              <div className="bg-white p-6 rounded-3xl shadow">
-                <h2 className="text-xl font-bold mb-4">Product Distribution</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={productData}
-                      dataKey="value"
-                      nameKey="name"
-                      outerRadius={100}
-                      label
-                    >
-                      {productData.map((_, i) => (
-                        <Cell key={i} fill={pieColors[i % pieColors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <button
+                onClick={handleClearFilters}
+                className="bg-gray-300 px-4 py-2 rounded-xl"
+              >
+                Clear
+              </button>
             </div>
-          </>
-        )}
 
+          </div>
+
+          {/* LOADING */}
+          {loading && (
+            <div className="grid md:grid-cols-4 gap-6">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          )}
+
+          {/* EMPTY */}
+          {!loading && !analytics && (
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-2xl text-center">
+              No analytics loaded
+            </div>
+          )}
+
+          {/* DASHBOARD */}
+          {!loading && analytics && (
+            <>
+              <DashboardStats analytics={analytics} />
+
+              <div className="grid xl:grid-cols-2 gap-6 mt-6">
+                <SalesBarChart chartData={chartData} />
+                <ProductPieChart productData={productData} />
+              </div>
+
+              <div className="mt-6">
+                <AIInsights analytics={analytics} />
+              </div>
+            </>
+          )}
+
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }

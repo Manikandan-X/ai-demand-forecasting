@@ -1,5 +1,6 @@
 import os
 import shutil
+import uuid
 
 from fastapi import APIRouter
 from fastapi import UploadFile
@@ -15,8 +16,9 @@ from app.db.deps import get_db
 from app.models.dataset import Dataset
 from app.models.user import User
 
-from app.core.dependencies import (
-    get_current_user
+from app.core.rbac import (
+    admin_or_analyst_required,
+    analyst_or_viewer_required
 )
 
 from app.services.dataset_service import (
@@ -27,6 +29,15 @@ from app.utils.notification_utils import (
     create_notification
 )
 
+from app.routers.websocket import (
+    send_dashboard_update
+)
+
+from app.utils.activity_logger import (
+    log_user_activity
+)
+from app.utils.cache_utils import clear_dashboard_cache
+
 router = APIRouter(
     prefix="/dataset",
     tags=["Dataset"]
@@ -34,13 +45,24 @@ router = APIRouter(
 
 UPLOAD_FOLDER = "uploads"
 
+os.makedirs(
+    UPLOAD_FOLDER,
+    exist_ok=True
+)
 
+
+# ==========================
+# UPLOAD DATASET
+# ==========================
 @router.post("/upload")
 async def upload_dataset(
+
     file: UploadFile = File(...),
+
     db: Session = Depends(get_db),
+
     current_user: User = Depends(
-        get_current_user
+        admin_or_analyst_required
     )
 ):
 
@@ -53,21 +75,37 @@ async def upload_dataset(
 
         file_extension = os.path.splitext(
             file.filename
-        )[1]
+        )[1].lower()
 
-        if file_extension not in allowed_extensions:
+        if (
+            file_extension
+            not in allowed_extensions
+        ):
 
             raise HTTPException(
                 status_code=400,
-                detail="Only CSV and Excel files allowed"
+                detail=(
+                    "Only CSV and "
+                    "Excel files allowed"
+                )
             )
+
+        # unique filename
+        unique_filename = (
+            f"{current_user.id}_"
+            f"{uuid.uuid4()}_"
+            f"{file.filename}"
+        )
 
         file_path = os.path.join(
             UPLOAD_FOLDER,
-            file.filename
+            unique_filename
         )
 
-        with open(file_path, "wb") as buffer:
+        with open(
+            file_path,
+            "wb"
+        ) as buffer:
 
             shutil.copyfileobj(
                 file.file,
@@ -86,18 +124,40 @@ async def upload_dataset(
 
         db.refresh(dataset)
 
+        # activity log
+        log_user_activity(
+            db=db,
+            user_id=current_user.id,
+            action="DATASET_UPLOAD",
+            details=(
+                f"{dataset.filename} "
+                f"uploaded"
+            )
+        )
+
+        # dataset processing
         summary = process_dataset(
             file_path
         )
+        
+        #clear_dashboard_cache(current_user.id)
 
-        # OPTIONAL SUCCESS NOTIFICATION
+        # success notification
         await create_notification(
             db=db,
             title="Dataset Uploaded",
-            message="Dataset uploaded successfully",
+            message=(
+                f"{dataset.filename} "
+                f"uploaded successfully"
+            ),
             user_id=current_user.id,
             notification_type="upload",
-            is_admin=True
+            is_admin=False
+        )
+
+        # realtime dashboard refresh
+        await send_dashboard_update(
+            user_id=current_user.id
         )
 
         return {
@@ -114,16 +174,20 @@ async def upload_dataset(
             summary
         }
 
+    except HTTPException:
+        raise
+
     except Exception as e:
 
-        # FAILED NOTIFICATION
         await create_notification(
             db=db,
             title="Upload Failed",
-            message="Dataset upload fails",
+            message=(
+                "Dataset upload failed"
+            ),
             user_id=current_user.id,
             notification_type="upload",
-            is_admin=True
+            is_admin=False
         )
 
         raise HTTPException(
@@ -132,33 +196,56 @@ async def upload_dataset(
         )
 
 
+# ==========================
+# GET DATASETS
+# ==========================
 @router.get("/")
 def get_datasets(
-    page: int = Query(1, ge=1),
-    limit: int = Query(5, ge=1, le=100),
+
+    page: int = Query(
+        1,
+        ge=1
+    ),
+
+    limit: int = Query(
+        5,
+        ge=1,
+        le=100
+    ),
 
     db: Session = Depends(get_db),
 
     current_user: User = Depends(
-        get_current_user
+        analyst_or_viewer_required
     )
 ):
 
-    skip = (page - 1) * limit
+    skip = (
+        page - 1
+    ) * limit
 
-    datasets = db.query(
+    query = db.query(
         Dataset
-    ).filter(
-        Dataset.uploaded_by ==
-        current_user.id
-    ).offset(skip).limit(limit).all()
+    )
 
-    total = db.query(
-        Dataset
-    ).filter(
-        Dataset.uploaded_by ==
-        current_user.id
-    ).count()
+    # non-admin only sees own
+    if current_user.role != "super_admin":
+
+        query = query.filter(
+            Dataset.uploaded_by ==
+            current_user.id
+        )
+
+    total = query.count()
+
+    datasets = (
+        query.order_by(
+            Dataset.created_at.desc()
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
     return {
         "page": page,
@@ -168,23 +255,33 @@ def get_datasets(
     }
 
 
+# ==========================
+# SEARCH DATASET
+# ==========================
 @router.get("/search/")
 def search_datasets(
+
     keyword: str,
 
     db: Session = Depends(get_db),
 
     current_user: User = Depends(
-        get_current_user
+        analyst_or_viewer_required
     )
 ):
 
-    datasets = db.query(
+    query = db.query(
         Dataset
-    ).filter(
-        Dataset.uploaded_by ==
-        current_user.id,
+    )
 
+    if current_user.role != "super_admin":
+
+        query = query.filter(
+            Dataset.uploaded_by ==
+            current_user.id
+        )
+
+    datasets = query.filter(
         Dataset.filename.ilike(
             f"%{keyword}%"
         )
@@ -193,24 +290,33 @@ def search_datasets(
     return datasets
 
 
+# ==========================
+# FILTER DATASET
+# ==========================
 @router.get("/filter/")
 def filter_datasets(
+
     start_date: str = None,
+
     end_date: str = None,
 
     db: Session = Depends(get_db),
 
     current_user: User = Depends(
-        get_current_user
+        analyst_or_viewer_required
     )
 ):
 
     query = db.query(
         Dataset
-    ).filter(
-        Dataset.uploaded_by ==
-        current_user.id
     )
+
+    if current_user.role != "super_admin":
+
+        query = query.filter(
+            Dataset.uploaded_by ==
+            current_user.id
+        )
 
     if start_date:
 
@@ -226,6 +332,8 @@ def filter_datasets(
             end_date
         )
 
-    datasets = query.all()
+    datasets = query.order_by(
+        Dataset.created_at.desc()
+    ).all()
 
     return datasets

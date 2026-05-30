@@ -6,50 +6,50 @@ import {
   FaFileAlt,
   FaChartBar,
   FaHistory,
-  FaUserShield
+  FaUserShield,
 } from "react-icons/fa";
 
 import { motion } from "framer-motion";
 
 export default function Sidebar() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(sessionStorage.getItem("user"));
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "super_admin";
 
   const menuItems = [
     {
       name: "Dashboard",
       path: "/dashboard",
-      icon: <FaChartBar />
+      icon: <FaChartBar />,
     },
     {
       name: "Upload Dataset",
       path: "/upload",
-      icon: <FaUpload />
+      icon: <FaUpload />,
     },
     {
       name: "Forecast",
       path: "/forecast",
-      icon: <FaChartLine />
+      icon: <FaChartLine />,
     },
     {
       name: "Forecast History",
       path: "/forecast-history",
-      icon: <FaHistory />
+      icon: <FaHistory />,
     },
     {
       name: "Reports",
       path: "/reports",
-      icon: <FaFileAlt />
-    }
+      icon: <FaFileAlt />,
+    },
   ];
 
   const adminMenu = [
     {
       name: "Admin Panel",
       path: "/admin",
-      icon: <FaUserShield />
-    }
+      icon: <FaUserShield />,
+    },
   ];
 
   return (
@@ -63,13 +63,21 @@ export default function Sidebar() {
         flex-col
         w-72
         min-h-screen
-        bg-gradient-to-b
-        from-slate-950
-        via-blue-950
-        to-slate-900
-        text-white
+
+        bg-white
+        text-gray-900
+
+        dark:bg-slate-950
+        dark:text-white
+
+        border-r
+        border-gray-200
+        dark:border-slate-800
+
         p-6
         shadow-2xl
+        transition-colors
+        duration-300
       "
     >
       {/* LOGO */}
@@ -77,14 +85,15 @@ export default function Sidebar() {
         <h2 className="text-3xl font-extrabold tracking-wide">
           AI Forecast
         </h2>
-        <p className="text-gray-400 text-sm mt-2">
+
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
           Smart Analytics Dashboard
         </p>
       </div>
 
       {/* MAIN MENU */}
       <div className="flex flex-col gap-3">
-        <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">
+        <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest mb-2">
           Main
         </p>
 
@@ -99,12 +108,19 @@ export default function Sidebar() {
               px-5
               py-4
               rounded-2xl
-              hover:bg-blue-700/40
+
+              text-gray-700
+              dark:text-slate-300
+
+              hover:bg-gray-100
+              dark:hover:bg-slate-800
+
+              hover:text-cyan-600
+              dark:hover:text-cyan-400
+
               transition
               duration-300
               hover:translate-x-1
-              text-lg
-              font-medium
             "
           >
             <span className="text-xl">{item.icon}</span>
@@ -116,7 +132,7 @@ export default function Sidebar() {
       {/* ADMIN SECTION */}
       {isAdmin && (
         <div className="flex flex-col gap-3 mt-10">
-          <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">
+          <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest mb-2">
             Admin
           </p>
 
@@ -131,12 +147,19 @@ export default function Sidebar() {
                 px-5
                 py-4
                 rounded-2xl
-                hover:bg-red-700/40
+
+                text-gray-700
+                dark:text-slate-300
+
+                hover:bg-red-100
+                dark:hover:bg-red-900/30
+
+                hover:text-red-600
+                dark:hover:text-red-400
+
                 transition
                 duration-300
                 hover:translate-x-1
-                text-lg
-                font-medium
               "
             >
               <span className="text-xl">{item.icon}</span>

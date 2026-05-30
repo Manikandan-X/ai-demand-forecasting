@@ -45,5 +45,6 @@ class Forecast(Base):
     
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        index=True
     )

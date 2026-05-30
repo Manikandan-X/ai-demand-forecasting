@@ -1,10 +1,6 @@
-import {
-  useEffect,
-  useState
-} from "react";
+import { useEffect, useState } from "react";
 
 import API from "../api/axios";
-
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import Loader from "../components/Loader";
@@ -19,1055 +15,406 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
-  CartesianGrid,
   Legend,
 } from "recharts";
 
 export default function AdminDashboard() {
-
   // =========================
   // STATE
   // =========================
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [error, setError] =
-    useState("");
+  const [dashboard, setDashboard] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
 
-  const [dashboard, setDashboard] =
-    useState(null);
-
-  const [analytics, setAnalytics] =
-    useState(null);
-
-  const [users, setUsers] =
-    useState([]);
-
-  const [datasets, setDatasets] =
-    useState([]);
-
-  const [reports, setReports] =
-    useState([]);
-
-  const [forecasts, setForecasts] =
-    useState([]);
+  const [users, setUsers] = useState([]);
+  const [datasets, setDatasets] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [forecasts, setForecasts] = useState([]);
 
   // =========================
-  // LOAD ADMIN DATA
+  // LOAD DATA
   // =========================
   useEffect(() => {
+    const loadAdminData = async () => {
+      try {
+        setLoading(true);
 
-    const loadAdminData =
-      async () => {
+        const [
+          dashboardRes,
+          analyticsRes,
+          usersRes,
+          datasetsRes,
+          reportsRes,
+          forecastsRes,
+        ] = await Promise.all([
+          API.get("/admin/dashboard"),
+          API.get("/admin/analytics"),
+          API.get("/admin/users"),
+          API.get("/admin/datasets"),
+          API.get("/admin/reports"),
+          API.get("/admin/forecasts"),
+        ]);
 
-        try {
+        setDashboard(dashboardRes.data);
+        setAnalytics(analyticsRes.data);
 
-          setLoading(true);
-
-          const [
-            dashboardRes,
-            analyticsRes,
-            usersRes,
-            datasetsRes,
-            reportsRes,
-            forecastsRes,
-          ] =
-            await Promise.all([
-              API.get(
-                "/admin/dashboard"
-              ),
-
-              API.get(
-                "/admin/analytics"
-              ),
-
-              API.get(
-                "/admin/users"
-              ),
-
-              API.get(
-                "/admin/datasets"
-              ),
-
-              API.get(
-                "/admin/reports"
-              ),
-
-              API.get(
-                "/admin/forecasts"
-              ),
-            ]);
-
-          setDashboard(
-            dashboardRes.data
-          );
-
-          setAnalytics(
-            analyticsRes.data
-          );
-
-          setUsers(
-            usersRes.data || []
-          );
-
-          setDatasets(
-            datasetsRes.data || []
-          );
-
-          setReports(
-            reportsRes.data || []
-          );
-
-          setForecasts(
-            forecastsRes.data || []
-          );
-
-        } catch (err) {
-
-          console.error(err);
-
-          setError(
-            err?.response?.data
-              ?.detail ||
-              "Failed to load admin dashboard"
-          );
-
-        } finally {
-
-          setLoading(false);
-        }
-      };
+        setUsers(usersRes.data?.users || []);
+        setDatasets(datasetsRes.data?.datasets || []);
+        setReports(reportsRes.data?.reports || []);
+        setForecasts(forecastsRes.data?.forecasts || []);
+      } catch (err) {
+        console.error(err);
+        setError(
+          err?.response?.data?.detail ||
+            "Failed to load admin dashboard"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
     loadAdminData();
-
   }, []);
 
   // =========================
   // ACTIONS
   // =========================
-  const toggleRole =
-    async (user) => {
+  const toggleRole = async (user) => {
+    try {
+      const newRole = user.role === "admin" ? "user" : "admin";
 
-      try {
+      await API.put(`/admin/users/${user.id}/role`, {
+        role: newRole,
+      });
 
-        const newRole =
-          user.role ===
-          "admin"
-            ? "user"
-            : "admin";
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id ? { ...u, role: newRole } : u
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Role update failed");
+    }
+  };
 
-        await API.put(
-          `/admin/users/${user.id}/role`,
-          {
-            role:
-              newRole,
-          }
-        );
+  const deleteUser = async (id) => {
+    if (!window.confirm("Delete this user?")) return;
 
-        setUsers(
-          (prev) =>
-            prev.map(
-              (u) =>
-                u.id ===
-                user.id
-                  ? {
-                      ...u,
-                      role:
-                        newRole,
-                    }
-                  : u
-            )
-        );
+    try {
+      await API.delete(`/admin/users/${id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert("Delete failed");
+    }
+  };
 
-      } catch (error) {
+  const deleteDataset = async (id) => {
+    if (!window.confirm("Delete this dataset?")) return;
 
-        console.error(
-          error
-        );
-
-        alert(
-          "Role update failed"
-        );
-      }
-    };
-
-  const deleteUser =
-    async (id) => {
-
-      const confirmDelete =
-        window.confirm(
-          "Delete this user?"
-        );
-
-      if (
-        !confirmDelete
-      ) return;
-
-      try {
-
-        await API.delete(
-          `/admin/users/${id}`
-        );
-
-        setUsers(
-          (prev) =>
-            prev.filter(
-              (u) =>
-                u.id !==
-                id
-            )
-        );
-
-      } catch (error) {
-
-        console.error(
-          error
-        );
-
-        alert(
-          error
-            ?.response
-            ?.data
-            ?.detail ||
-            "Delete failed"
-        );
-      }
-    };
-
-  const deleteDataset =
-    async (id) => {
-
-      const confirmDelete =
-        window.confirm(
-          "Delete this dataset?"
-        );
-
-      if (
-        !confirmDelete
-      ) return;
-
-      try {
-
-        await API.delete(
-          `/admin/datasets/${id}`
-        );
-
-        setDatasets(
-          (prev) =>
-            prev.filter(
-              (d) =>
-                d.id !==
-                id
-            )
-        );
-
-      } catch (error) {
-
-        console.error(
-          error
-        );
-
-        alert(
-          "Delete failed"
-        );
-      }
-    };
+    try {
+      await API.delete(`/admin/datasets/${id}`);
+      setDatasets((prev) => prev.filter((d) => d.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert("Delete failed");
+    }
+  };
 
   // =========================
   // CHART DATA
   // =========================
-  const analyticsData =
-    [
-      {
-        name:
-          "Users",
-        value:
-          analytics?.users ||
-          0,
-      },
+  const analyticsData = [
+    { name: "Users", value: analytics?.users || 0 },
+    { name: "Datasets", value: analytics?.datasets || 0 },
+    { name: "Forecasts", value: analytics?.forecasts || 0 },
+  ];
 
-      {
-        name:
-          "Datasets",
-        value:
-          analytics?.datasets ||
-          0,
-      },
+  const safeForecasts = Array.isArray(forecasts) ? forecasts : [];
 
-      {
-        name:
-          "Forecasts",
-        value:
-          analytics?.forecasts ||
-          0,
-      },
-    ];
+  const modelCounts = safeForecasts.reduce((acc, item) => {
+    const model = item?.model_name || "Unknown";
+    acc[model] = (acc[model] || 0) + 1;
+    return acc;
+  }, {});
 
-  const modelCounts =
-    forecasts.reduce(
-      (
-        acc,
-        item
-      ) => {
+  const forecastChartData = Object.entries(modelCounts).map(
+    ([model, count]) => ({
+      model,
+      count,
+    })
+  );
 
-        const model =
-          item.model_name ||
-          "Unknown";
-
-        acc[model] =
-          (acc[
-            model
-          ] || 0) + 1;
-
-        return acc;
-      },
-      {}
-    );
-
-  const forecastChartData =
-    Object.entries(
-      modelCounts
-    ).map(
-      ([
-        model,
-        count,
-      ]) => ({
-        model,
-        count,
-      })
-    );
-
-  const COLORS =
-    [
-      "#3b82f6",
-      "#10b981",
-      "#f59e0b",
-      "#ef4444",
-    ];
+  const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
   // =========================
-  // LOADING
+  // LOADING STATE
   // =========================
-  if (loading) {
+  if (loading) return <Loader />;
 
-    return (
-      <Loader />
-    );
-  }
-
-  // =========================
+    // =========================
   // UI
   // =========================
   return (
-        <div className="flex min-h-screen bg-slate-100">
-
+    <div
+      className="
+      flex
+      min-h-screen
+      bg-slate-100
+      dark:bg-slate-950
+      text-slate-900
+      dark:text-white
+      transition-colors
+      duration-300
+      "
+    >
       <Sidebar />
 
       <div className="flex-1">
-
         <Navbar />
 
-        <div className="p-8 space-y-8">
+        <div className="p-6 md:p-10 space-y-8">
 
           {/* TITLE */}
           <div>
-            <h1 className="text-4xl font-bold text-slate-800">
+            <h1 className="text-4xl font-extrabold text-slate-800 dark:text-white">
               Admin Dashboard
             </h1>
 
-            <p className="text-slate-500 mt-2">
-              Monitor users, datasets,
-              forecasting activity,
-              reports and analytics
+            <p className="text-slate-500 dark:text-slate-400 mt-2">
+              Monitor users, datasets, forecasts, reports and analytics
             </p>
           </div>
 
           {/* ERROR */}
           {error && (
-            <div
-              className="
-              bg-red-100
-              text-red-700
-              p-4
-              rounded-xl
-              "
-            >
+            <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-4 rounded-xl border border-red-300 dark:border-red-800">
               {error}
             </div>
           )}
 
           {/* ANALYTICS CARDS */}
-          <div
-            className="
-            grid
-            grid-cols-1
-            md:grid-cols-4
-            gap-6
-            "
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
 
-            <div
-              className="
-              bg-white
-              rounded-3xl
-              shadow-lg
-              p-6
-              "
-            >
-              <h3 className="text-gray-500">
-                Users
-              </h3>
-
-              <h2
-                className="
-                text-4xl
-                font-bold
-                mt-2
-                "
-              >
-                {analytics?.users}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+              <h3 className="text-gray-500 dark:text-slate-400">Users</h3>
+              <h2 className="text-4xl font-bold mt-2">
+                {analytics?.users || 0}
               </h2>
             </div>
 
-            <div
-              className="
-              bg-white
-              rounded-3xl
-              shadow-lg
-              p-6
-              "
-            >
-              <h3 className="text-gray-500">
-                Datasets
-              </h3>
-
-              <h2
-                className="
-                text-4xl
-                font-bold
-                mt-2
-                "
-              >
-                {
-                  analytics?.datasets
-                }
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+              <h3 className="text-gray-500 dark:text-slate-400">Datasets</h3>
+              <h2 className="text-4xl font-bold mt-2">
+                {analytics?.datasets || 0}
               </h2>
             </div>
 
-            <div
-              className="
-              bg-white
-              rounded-3xl
-              shadow-lg
-              p-6
-              "
-            >
-              <h3 className="text-gray-500">
-                Forecasts
-              </h3>
-
-              <h2
-                className="
-                text-4xl
-                font-bold
-                mt-2
-                "
-              >
-                {
-                  analytics?.forecasts
-                }
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+              <h3 className="text-gray-500 dark:text-slate-400">Forecasts</h3>
+              <h2 className="text-4xl font-bold mt-2">
+                {analytics?.forecasts || 0}
               </h2>
             </div>
 
-            <div
-              className="
-              bg-white
-              rounded-3xl
-              shadow-lg
-              p-6
-              "
-            >
-              <h3 className="text-gray-500">
-                Avg Accuracy
-              </h3>
-
-              <h2
-                className="
-                text-4xl
-                font-bold
-                mt-2
-                "
-              >
-                {
-                  analytics?.average_accuracy
-                }
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+              <h3 className="text-gray-500 dark:text-slate-400">Avg Accuracy</h3>
+              <h2 className="text-4xl font-bold mt-2">
+                {analytics?.average_accuracy || 0}
               </h2>
             </div>
 
           </div>
 
           {/* CHARTS */}
-          <div
-            className="
-            grid
-            grid-cols-1
-            lg:grid-cols-2
-            gap-6
-            "
-          >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-            {/* BAR */}
-            <div
-              className="
-              bg-white
-              rounded-3xl
-              p-6
-              shadow-lg
-              "
-            >
-
-              <h2
-                className="
-                text-2xl
-                font-bold
-                mb-6
-                "
-              >
+            {/* BAR CHART */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-lg border border-slate-200 dark:border-slate-800">
+              <h2 className="text-2xl font-bold mb-6">
                 System Analytics
               </h2>
 
-              <ResponsiveContainer
-                width="100%"
-                height={300}
-              >
-                <BarChart
-                  data={
-                    analyticsData
-                  }
-                >
-                  <XAxis
-                    dataKey="name"
-                  />
-
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analyticsData}>
+                  <XAxis dataKey="name" />
                   <YAxis />
-
                   <Tooltip />
-
                   <Legend />
-
-                  <Bar
-                    dataKey="value"
-                    fill="#3b82f6"
-                  />
+                  <Bar dataKey="value" fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>
-
             </div>
 
-            {/* PIE */}
-            <div
-              className="
-              bg-white
-              rounded-3xl
-              p-6
-              shadow-lg
-              "
-            >
-
-              <h2
-                className="
-                text-2xl
-                font-bold
-                mb-6
-                "
-              >
+            {/* PIE CHART */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-lg border border-slate-200 dark:border-slate-800">
+              <h2 className="text-2xl font-bold mb-6">
                 Forecast Models
               </h2>
 
-              <ResponsiveContainer
-                width="100%"
-                height={300}
-              >
+              <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-
                   <Pie
-                    data={
-                      forecastChartData
-                    }
+                    data={forecastChartData}
                     dataKey="count"
                     nameKey="model"
-                    outerRadius={
-                      100
-                    }
+                    outerRadius={100}
                   >
-                    {forecastChartData.map(
-                      (
-                        _,
-                        index
-                      ) => (
-                        <Cell
-                          key={
-                            index
-                          }
-                          fill={
-                            COLORS[
-                              index %
-                                COLORS.length
-                            ]
-                          }
-                        />
-                      )
-                    )}
+                    {forecastChartData.map((_, index) => (
+                      <Cell
+                        key={index}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
                   </Pie>
-
                   <Tooltip />
-
                 </PieChart>
               </ResponsiveContainer>
-
             </div>
 
           </div>
 
-          {/* USERS */}
-          <div
-            className="
-            bg-white
-            rounded-3xl
-            shadow-lg
-            p-6
-            overflow-x-auto
-            "
-          >
-
-            <h2
-              className="
-              text-2xl
-              font-bold
-              mb-4
-              "
-            >
-              Manage Users
-            </h2>
+          {/* USERS TABLE */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6 overflow-x-auto">
+            <h2 className="text-2xl font-bold mb-5">Manage Users</h2>
 
             <table className="w-full">
-
               <thead>
-                <tr
-                  className="
-                  border-b
-                  text-left
-                  "
-                >
-                  <th className="py-3">
-                    ID
-                  </th>
-
-                  <th>
-                    Name
-                  </th>
-
-                  <th>
-                    Email
-                  </th>
-
-                  <th>
-                    Role
-                  </th>
-
-                  <th>
-                    Actions
-                  </th>
+                <tr className="border-b border-slate-300 dark:border-slate-700 text-left">
+                  <th className="py-3">ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
+                {users.map((user) => (
+                  <tr key={user.id} className="border-b border-slate-200 dark:border-slate-800">
 
-                {users.map(
-                  (user) => (
-                    <tr
-                      key={
-                        user.id
-                      }
-                      className="
-                      border-b
-                      "
-                    >
+                    <td className="py-4">{user.id}</td>
+                    <td>{user.name}</td>
 
-                      <td className="py-4">
-                        {
-                          user.id
-                        }
-                      </td>
+                    <td className="text-slate-600 dark:text-slate-300">
+                      {user.email}
+                    </td>
 
-                      <td>
-                        {
-                          user.name
-                        }
-                      </td>
+                    <td>
+                      <span className="px-3 py-1 rounded-full text-sm bg-slate-200 dark:bg-slate-800">
+                        {user.role}
+                      </span>
+                    </td>
 
-                      <td>
-                        {
-                          user.email
-                        }
-                      </td>
+                    <td className="flex gap-2 py-4">
 
-                      <td>
-                        {
-                          user.role
-                        }
-                      </td>
-
-                      <td
-                        className="
-                        flex
-                        gap-2
-                        py-4
-                        "
+                      <button
+                        onClick={() => toggleRole(user)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
                       >
+                        Toggle Role
+                      </button>
 
-                        <button
-                          onClick={() =>
-                            toggleRole(
-                              user
-                            )
-                          }
-                          className="
-                          bg-blue-600
-                          text-white
-                          px-4
-                          py-2
-                          rounded-lg
-                          "
-                        >
-                          Toggle Role
-                        </button>
+                      <button
+                        onClick={() => deleteUser(user.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+                      >
+                        Delete
+                      </button>
 
-                        <button
-                          onClick={() =>
-                            deleteUser(
-                              user.id
-                            )
-                          }
-                          className="
-                          bg-red-600
-                          text-white
-                          px-4
-                          py-2
-                          rounded-lg
-                          "
-                        >
-                          Delete
-                        </button>
-
-                      </td>
-
-                    </tr>
-                  )
-                )}
-
+                    </td>
+                  </tr>
+                ))}
               </tbody>
-
             </table>
-
           </div>
 
           {/* DATASETS */}
-          <div
-            className="
-            bg-white
-            rounded-3xl
-            shadow-lg
-            p-6
-            "
-          >
-
-            <h2
-              className="
-              text-2xl
-              font-bold
-              mb-5
-              "
-            >
-              Manage Datasets
-            </h2>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+            <h2 className="text-2xl font-bold mb-5">Manage Datasets</h2>
 
             <div className="space-y-4">
-
-              {datasets.map(
-                (
-                  dataset
-                ) => (
-                  <div
-                    key={
-                      dataset.id
-                    }
-                    className="
-                    flex
-                    justify-between
-                    items-center
-                    border
-                    rounded-xl
-                    p-4
-                    "
-                  >
-
-                    <div>
-
-                      <p
-                        className="
-                        font-semibold
-                        "
-                      >
-                        {
-                          dataset.filename
-                        }
-                      </p>
-
-                      <p
-                        className="
-                        text-sm
-                        text-gray-500
-                        "
-                      >
-                        Uploaded:
-                        {" "}
-                        {new Date(
-                          dataset.created_at
-                        ).toLocaleString()}
-                      </p>
-
-                    </div>
-
-                    <button
-                      onClick={() =>
-                        deleteDataset(
-                          dataset.id
-                        )
-                      }
-                      className="
-                      bg-red-600
-                      text-white
-                      px-4
-                      py-2
-                      rounded-xl
-                      "
-                    >
-                      Delete
-                    </button>
-
+              {datasets.map((dataset) => (
+                <div
+                  key={dataset.id}
+                  className="flex justify-between items-center border border-slate-200 dark:border-slate-700 rounded-2xl p-5 bg-slate-50 dark:bg-slate-950"
+                >
+                  <div>
+                    <p className="font-semibold">{dataset.filename}</p>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                      Uploaded: {new Date(dataset.created_at).toLocaleString()}
+                    </p>
                   </div>
-                )
-              )}
 
+                  <button
+                    onClick={() => deleteDataset(dataset.id)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
             </div>
-
           </div>
 
           {/* REPORTS */}
-          <div
-            className="
-            bg-white
-            rounded-3xl
-            shadow-lg
-            p-6
-            overflow-x-auto
-            "
-          >
-
-            <h2
-              className="
-              text-2xl
-              font-bold
-              mb-5
-              "
-            >
-              Uploaded Reports
-            </h2>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6 overflow-x-auto">
+            <h2 className="text-2xl font-bold mb-5">Uploaded Reports</h2>
 
             <table className="w-full">
-
               <thead>
-                <tr
-                  className="
-                  border-b
-                  text-left
-                  "
-                >
-                  <th>
-                    ID
-                  </th>
-
-                  <th>
-                    Model
-                  </th>
-
-                  <th>
-                    Dataset ID
-                  </th>
-
-                  <th>
-                    Accuracy
-                  </th>
-
-                  <th>
-                    Created
-                  </th>
+                <tr className="border-b border-slate-300 dark:border-slate-700 text-left">
+                  <th>ID</th>
+                  <th>Model</th>
+                  <th>Dataset</th>
+                  <th>Accuracy</th>
+                  <th>Created</th>
                 </tr>
               </thead>
 
               <tbody>
-
-                {reports.map(
-                  (
-                    report
-                  ) => (
-                    <tr
-                      key={
-                        report.id
-                      }
-                      className="
-                      border-b
-                      "
-                    >
-
-                      <td className="py-4">
-                        {
-                          report.id
-                        }
-                      </td>
-
-                      <td>
-                        {
-                          report.model_name
-                        }
-                      </td>
-
-                      <td>
-                        {
-                          report.dataset_id
-                        }
-                      </td>
-
-                      <td>
-                        {
-                          report.accuracy
-                        }
-                      </td>
-
-                      <td>
-                        {new Date(
-                          report.created_at
-                        ).toLocaleString()}
-                      </td>
-
-                    </tr>
-                  )
-                )}
-
+                {reports.map((report) => (
+                  <tr key={report.id} className="border-b border-slate-200 dark:border-slate-800">
+                    <td className="py-4">{report.id}</td>
+                    <td>{report.model_name}</td>
+                    <td>{report.dataset_id}</td>
+                    <td>{report.accuracy}</td>
+                    <td className="text-slate-600 dark:text-slate-300">
+                      {new Date(report.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
-
             </table>
-
           </div>
 
           {/* FORECAST ACTIVITY */}
-          <div
-            className="
-            bg-white
-            rounded-3xl
-            shadow-lg
-            p-6
-            "
-          >
-
-            <h2
-              className="
-              text-2xl
-              font-bold
-              mb-5
-              "
-            >
-              Forecast Activity
-            </h2>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+            <h2 className="text-2xl font-bold mb-5">Forecast Activity</h2>
 
             <div className="space-y-4">
+              {forecasts.map((item) => (
+                <div
+                  key={item.id}
+                  className="border border-slate-200 dark:border-slate-700 rounded-2xl p-5 bg-slate-50 dark:bg-slate-950"
+                >
+                  <p><strong>Model:</strong> {item.model_name}</p>
+                  <p><strong>Dataset:</strong> {item.dataset_id}</p>
+                  <p><strong>Accuracy:</strong> {item.accuracy}</p>
 
-              {forecasts.map(
-                (
-                  item
-                ) => (
-                  <div
-                    key={
-                      item.id
-                    }
-                    className="
-                    border
-                    rounded-2xl
-                    p-4
-                    "
-                  >
-
-                    <div
-                      className="
-                      flex
-                      justify-between
-                      flex-wrap
-                      gap-3
-                      "
-                    >
-
-                      <div>
-                        <p>
-                          <strong>
-                            Model:
-                          </strong>{" "}
-                          {
-                            item.model_name
-                          }
-                        </p>
-
-                        <p>
-                          <strong>
-                            Dataset:
-                          </strong>{" "}
-                          {
-                            item.dataset_id
-                          }
-                        </p>
-
-                        <p>
-                          <strong>
-                            Accuracy:
-                          </strong>{" "}
-                          {
-                            item.accuracy
-                          }
-                        </p>
-                      </div>
-
-                      <div>
-                        {new Date(
-                          item.created_at
-                        ).toLocaleString()}
-                      </div>
-
-                    </div>
-
-                  </div>
-                )
-              )}
-
+                  <p className="text-slate-500 dark:text-slate-400 mt-2">
+                    {new Date(item.created_at).toLocaleString()}
+                  </p>
+                </div>
+              ))}
             </div>
-
           </div>
 
         </div>
-
       </div>
-
     </div>
   );
 }

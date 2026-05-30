@@ -39,7 +39,8 @@ class Dataset(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        index=True
     )
 
     # RELATIONSHIP
