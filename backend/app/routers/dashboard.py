@@ -19,8 +19,8 @@ from app.models.user import User
 from app.core.dependencies import (
     get_current_user
 )
-from app.services.dashboard_service import (
-    generate_dashboard_data
+from app.services.dashboard_manager_service import (
+    DashboardManagerService
 )
 
 from app.core.rbac import (
@@ -34,7 +34,9 @@ router = APIRouter(
     prefix="/dashboard",
     tags=["Dashboard"]
 )
-
+dashboard_manager = (
+    DashboardManagerService()
+)
 
 # DASHBOARD OVERVIEW
 @router.get("/overview")
@@ -48,52 +50,13 @@ async def dashboard_overview(
     )
 ):
 
-    total_datasets = db.query(
-        Dataset
-    ).filter(
-        Dataset.uploaded_by ==
-        current_user.id
-    ).count()
-
-    total_forecasts = db.query(
-        ForecastHistory
-    ).filter(
-        ForecastHistory.user_id ==
-        current_user.id
-    ).count()
-
-    average_accuracy = db.query(
-        func.avg(
-            ForecastHistory.accuracy
+    return await (
+        dashboard_manager
+        .dashboard_overview(
+            db=db,
+            current_user=current_user
         )
-    ).filter(
-        ForecastHistory.user_id ==
-        current_user.id
-    ).scalar()
-
-    if average_accuracy:
-
-        average_accuracy = round(
-            float(
-                average_accuracy
-            ),
-            2
-        )
-
-    else:
-
-        average_accuracy = 0
-
-    return {
-        "total_datasets":
-        total_datasets,
-
-        "total_forecasts":
-        total_forecasts,
-
-        "average_accuracy":
-        average_accuracy
-    }
+    )
 
 
 # MONTHLY SALES TRENDS
@@ -105,52 +68,14 @@ async def monthly_sales(
     current_user: User = Depends(analyst_or_viewer_required)
 ):
 
-    dataset = db.query(
-        Dataset
-    ).filter(
-        Dataset.id ==
-        dataset_id,
-
-        Dataset.uploaded_by ==
-        current_user.id
-    ).first()
-
-    if not dataset:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset not found"
+    return await (
+        dashboard_manager
+        .monthly_sales(
+            dataset_id=dataset_id,
+            db=db,
+            current_user=current_user
         )
-
-    df = pd.read_csv(
-        dataset.file_path
     )
-
-    df.columns = df.columns.str.strip()
-
-    df["Date"] = pd.to_datetime(
-        df["Date"],
-        format="%d-%m-%Y"
-    )
-
-    df["Month"] = df[
-        "Date"
-    ].dt.strftime("%Y-%m")
-
-    monthly_sales = df.groupby(
-        "Month"
-    )["Total_Amount"].sum()
-
-    results = []
-
-    for month, sales in monthly_sales.items():
-
-        results.append({
-            "month": month,
-            "sales": float(sales)
-        })
-
-    return results
 
 
 # TOP PRODUCTS
@@ -163,47 +88,15 @@ async def top_products(
     current_user: User =Depends(analyst_or_viewer_required)
 ):
 
-    dataset = db.query(
-        Dataset
-    ).filter(
-        Dataset.id ==
-        dataset_id,
-
-        Dataset.uploaded_by ==
-        current_user.id
-    ).first()
-
-    if not dataset:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset not found"
+    return await (
+        dashboard_manager
+        .top_products(
+            dataset_id=dataset_id,
+            limit=limit,
+            db=db,
+            current_user=current_user
         )
-
-    df = pd.read_csv(
-        dataset.file_path
     )
-
-    df.columns = df.columns.str.strip()
-
-    top_products = df.groupby(
-        "Product"
-    )["Total_Amount"].sum()
-
-    top_products = top_products.sort_values(
-        ascending=False
-    ).head(limit)
-
-    results = []
-
-    for product, sales in top_products.items():
-
-        results.append({
-            "product": product,
-            "sales": float(sales)
-        })
-
-    return results
 
 
 # CATEGORY FILTER ANALYTICS
@@ -218,49 +111,15 @@ async def category_analysis(
     current_user: User = Depends(analyst_or_viewer_required)
 ):
 
-    dataset = db.query(
-        Dataset
-    ).filter(
-        Dataset.id ==
-        dataset_id,
-
-        Dataset.uploaded_by ==
-        current_user.id
-    ).first()
-
-    if not dataset:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset not found"
+    return await (
+        dashboard_manager
+        .category_analysis(
+            dataset_id=dataset_id,
+            category=category,
+            db=db,
+            current_user=current_user
         )
-
-    df = pd.read_csv(
-        dataset.file_path
     )
-
-    df.columns = df.columns.str.strip()
-
-    if category:
-
-        df = df[
-            df["Category"] == category
-        ]
-
-    grouped = df.groupby(
-        "Category"
-    )["Total_Amount"].sum()
-
-    results = []
-
-    for cat, amount in grouped.items():
-
-        results.append({
-            "category": cat,
-            "sales": float(amount)
-        })
-
-    return results
 
 
 # RECENT FORECAST ACTIVITY
@@ -272,42 +131,13 @@ async def recent_activities(
     )
 ):
 
-    activities = (
-        db.query(
-            ForecastHistory.id,
-            ForecastHistory.dataset_id,
-            ForecastHistory.model_name,
-            ForecastHistory.accuracy,
-            ForecastHistory.created_at
+    return await (
+        dashboard_manager
+        .recent_activities(
+            db=db,
+            current_user=current_user
         )
-        .filter(
-            ForecastHistory.user_id ==
-            current_user.id
-        )
-        .order_by(
-            ForecastHistory.created_at.desc()
-        )
-        .limit(10)
-        .all()
     )
-
-    return [
-        {
-            "id": activity.id,
-            "dataset_id":
-            activity.dataset_id,
-
-            "model_name":
-            activity.model_name,
-
-            "accuracy":
-            activity.accuracy,
-
-            "created_at":
-            activity.created_at
-        }
-        for activity in activities
-    ]
 
 
 @router.get("/search")
@@ -523,58 +353,17 @@ async def get_dashboard(
     )
 ):
 
-    # =========================
-    # CHECK DATASET
-    # =========================
-    dataset = db.query(
-        Dataset
-    ).filter(
-
-        Dataset.id ==
-        dataset_id,
-
-        Dataset.uploaded_by ==
-        current_user.id
-
-    ).first()
-
-    if not dataset:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset not found"
+    return await (
+        dashboard_manager
+        .get_dashboard(
+            dataset_id=dataset_id,
+            region=region,
+            category=category,
+            start_date=start_date,
+            end_date=end_date,
+            db=db,
+            current_user=current_user
         )
-
-    # =========================
-    # GENERATE DASHBOARD DATA
-    # =========================
-    dashboard_data = generate_dashboard_data(
-
-        file_path=dataset.file_path,
-
-        region=region,
-
-        category=category,
-
-        start_date=start_date,
-
-        end_date=end_date
     )
-    
-    
-    # =========================
-    # RESPONSE
-    # =========================
-    return {
-
-        "dataset_id":
-        dataset.id,
-
-        "filename":
-        dataset.filename,
-
-        "analytics":
-        dashboard_data
-    }
 
     

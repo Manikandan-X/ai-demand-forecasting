@@ -1,8 +1,5 @@
-import pandas as pd
-
 from fastapi import APIRouter
 from fastapi import Depends
-from fastapi import HTTPException
 from fastapi import BackgroundTasks
 
 from fastapi.responses import FileResponse
@@ -11,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
 
-from app.models.dataset import Dataset
 from app.models.user import User
 
 from app.core.rbac import (
@@ -19,26 +15,19 @@ from app.core.rbac import (
 )
 
 from app.services.report_service import (
-    generate_excel_report,
-    generate_pdf_report
+    ReportService
 )
 
-from app.utils.notification_utils import (
-    create_notification
-)
-
-from app.utils.activity_logger import (
-    log_user_activity
-)
-
-from app.routers.websocket import (
-    send_dashboard_update
+from app.services.notification_service import (
+    NotificationService
 )
 
 router = APIRouter(
     prefix="/reports",
     tags=["Reports"]
 )
+
+report_service = ReportService()
 
 
 # ==========================
@@ -72,74 +61,28 @@ async def export_excel_report(
     )
 ):
 
-    dataset = db.query(
-        Dataset
-    ).filter(
-        Dataset.id ==
-        dataset_id,
-
-        Dataset.uploaded_by ==
-        current_user.id
-    ).first()
-
-    if not dataset:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset not found"
-        )
-
-    if dataset.file_path.endswith(
-        ".csv"
-    ):
-
-        df = pd.read_csv(
-            dataset.file_path
-        )
-
-    else:
-
-        df = pd.read_excel(
-            dataset.file_path
-        )
-
-    report_path = (
-        generate_excel_report(
-            df,
-            f"dataset_{dataset_id}.xlsx"
+    report_path = await (
+        report_service
+        .export_excel_report(
+            db=db,
+            dataset_id=dataset_id,
+            current_user=current_user
         )
     )
 
-    log_user_activity(
+    NotificationService.create_notification(
+
         db=db,
+
+        title="Report Ready",
+
+        message=f"Excel report generated",
+
         user_id=current_user.id,
-        action=
-        "REPORT_EXCEL_DOWNLOAD",
-        details=(
-            f"Excel report "
-            f"downloaded for "
-            f"{dataset.filename}"
-        )
-    )
 
-    await create_notification(
-        db=db,
-        title=
-        "Report Generated",
-        message=
-        "Excel report generated successfully",
-        user_id=
-        current_user.id,
-        notification_type=
-        "report",
-        is_admin=False
+        notification_type="report"
     )
-
-    await send_dashboard_update(
-        user_id=
-        current_user.id
-    )
-
+    
     background_tasks.add_task(
         log_report_generation
     )
@@ -148,10 +91,8 @@ async def export_excel_report(
 
         path=report_path,
 
-        filename=(
-            f"dataset_"
-            f"{dataset_id}.xlsx"
-        ),
+        filename=
+        f"dataset_{dataset_id}.xlsx",
 
         media_type=(
             "application/"
@@ -183,74 +124,28 @@ async def export_pdf_report(
     )
 ):
 
-    dataset = db.query(
-        Dataset
-    ).filter(
-        Dataset.id ==
-        dataset_id,
-
-        Dataset.uploaded_by ==
-        current_user.id
-    ).first()
-
-    if not dataset:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Dataset not found"
-        )
-
-    if dataset.file_path.endswith(
-        ".csv"
-    ):
-
-        df = pd.read_csv(
-            dataset.file_path
-        )
-
-    else:
-
-        df = pd.read_excel(
-            dataset.file_path
-        )
-
-    report_path = (
-        generate_pdf_report(
-            df,
-            f"dataset_{dataset_id}.pdf"
+    report_path = await (
+        report_service
+        .export_pdf_report(
+            db=db,
+            dataset_id=dataset_id,
+            current_user=current_user
         )
     )
 
-    log_user_activity(
+    NotificationService.create_notification(
+
         db=db,
+
+        title="Report Ready",
+
+        message=f"PDF report generated",
+
         user_id=current_user.id,
-        action=
-        "REPORT_PDF_DOWNLOAD",
-        details=(
-            f"PDF report "
-            f"downloaded for "
-            f"{dataset.filename}"
-        )
-    )
 
-    await create_notification(
-        db=db,
-        title=
-        "Report Generated",
-        message=
-        "PDF report generated successfully",
-        user_id=
-        current_user.id,
-        notification_type=
-        "report",
-        is_admin=False
+        notification_type="report"
     )
-
-    await send_dashboard_update(
-        user_id=
-        current_user.id
-    )
-
+    
     background_tasks.add_task(
         log_report_generation
     )
@@ -259,10 +154,8 @@ async def export_pdf_report(
 
         path=report_path,
 
-        filename=(
-            f"dataset_"
-            f"{dataset_id}.pdf"
-        ),
+        filename=
+        f"dataset_{dataset_id}.pdf",
 
         media_type=
         "application/pdf"

@@ -262,6 +262,27 @@ def generate_dashboard_data(
 
         categories.sort()
 
+        # =========================
+        # GROWTH PERCENTAGE
+        # =========================
+
+        growth_percentage = 0
+
+        if len(values) >= 2:
+
+            first_value = values[0]
+            last_value = values[-1]
+
+            if first_value > 0:
+
+                growth_percentage = round(
+                    (
+                        (last_value - first_value)
+                        /
+                        first_value
+                    ) * 100,
+                    2
+                )
     # =========================
     # RESPONSE
     # =========================
@@ -283,6 +304,9 @@ def generate_dashboard_data(
 
         "categories":
         categories,
+        
+        "growth_percentage":
+        growth_percentage,
 
         # AI ANALYTICS
         "trend":
@@ -293,4 +317,6 @@ def generate_dashboard_data(
 
         "forecast_next_month":
         forecast_next_month
+        
+        
     }

@@ -4,6 +4,7 @@ from sqlalchemy import Float
 from sqlalchemy import String
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
+from sqlalchemy import Index
 
 from datetime import datetime
 
@@ -13,6 +14,16 @@ from app.db.base import Base
 class Forecast(Base):
 
     __tablename__ = "forecasts"
+    
+    __table_args__ = (
+
+        Index(
+            "idx_forecast_dataset_created",
+            "dataset_id",
+            "created_at"
+        ),
+
+    )
 
     id = Column(
         Integer,

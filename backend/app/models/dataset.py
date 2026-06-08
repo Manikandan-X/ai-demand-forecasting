@@ -3,6 +3,8 @@ from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
+from sqlalchemy import Index
+
 from sqlalchemy.orm import relationship
 
 from datetime import datetime
@@ -13,6 +15,16 @@ from app.db.base import Base
 class Dataset(Base):
 
     __tablename__ = "datasets"
+    
+    __table_args__ = (
+
+        Index(
+            "idx_dataset_uploaded_created",
+            "uploaded_by",
+            "created_at"
+        ),
+
+    )
 
     id = Column(
         Integer,

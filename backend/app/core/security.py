@@ -1,7 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import (
+    datetime,
+    timedelta
+)
 
 from jose import jwt
-from passlib.context import CryptContext
+from passlib.context import (
+    CryptContext
+)
 
 from app.core.config import (
     SECRET_KEY,
@@ -14,9 +19,21 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 
+JWT_ISSUER = (
+    "ai-demand-forecasting"
+)
 
-def hash_password(password: str):
-    return pwd_context.hash(password)
+JWT_AUDIENCE = (
+    "forecast-users"
+)
+
+
+def hash_password(
+    password: str
+):
+    return pwd_context.hash(
+        password
+    )
 
 
 def verify_password(
@@ -29,15 +46,36 @@ def verify_password(
     )
 
 
-def create_access_token(data: dict):
+def create_access_token(
+    data: dict
+):
 
     to_encode = data.copy()
 
-    expire = datetime.utcnow() + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = (
+        datetime.utcnow()
+        + timedelta(
+            minutes=
+            ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     )
 
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp":
+        expire,
+
+        "iat":
+        datetime.utcnow(),
+
+        "iss":
+        JWT_ISSUER,
+
+        "aud":
+        JWT_AUDIENCE,
+
+        "type":
+        "access"
+    })
 
     encoded_jwt = jwt.encode(
         to_encode,

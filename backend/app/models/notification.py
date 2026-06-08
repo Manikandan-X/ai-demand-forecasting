@@ -4,6 +4,7 @@ from sqlalchemy import String
 from sqlalchemy import Boolean
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
+from sqlalchemy import Index
 
 from sqlalchemy.orm import relationship
 
@@ -15,6 +16,22 @@ from app.db.base import Base
 class Notification(Base):
 
     __tablename__ = "notifications"
+    
+    __table_args__ = (
+
+        Index(
+            "idx_notification_user_read",
+            "user_id",
+            "is_read"
+        ),
+
+        Index(
+            "idx_notification_user_created",
+            "user_id",
+            "created_at"
+        ),
+
+    )
 
     id = Column(
         Integer,

@@ -14,6 +14,24 @@ from reportlab.lib.styles import (
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from fastapi import HTTPException
+
+from sqlalchemy.orm import Session
+
+from app.models.dataset import Dataset
+
+from app.services.notification_service import (
+    NotificationService
+)
+
+from app.utils.activity_logger import (
+    log_user_activity
+)
+
+from app.routers.websocket import (
+    send_dashboard_update
+)
+
 
 REPORT_FOLDER = "reports"
 
@@ -263,3 +281,187 @@ def generate_pdf_report(
     document.build(elements)
 
     return report_path
+
+class ReportService:
+
+    @staticmethod
+    async def export_excel_report(
+
+        db: Session,
+
+        dataset_id: int,
+
+        current_user
+    ):
+
+        dataset = (
+
+            db.query(Dataset)
+
+            .filter(
+                Dataset.id == dataset_id,
+
+                Dataset.uploaded_by ==
+                current_user.id
+            )
+
+            .first()
+        )
+
+        if not dataset:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found"
+            )
+
+        if dataset.file_path.endswith(".csv"):
+
+            df = pd.read_csv(
+                dataset.file_path
+            )
+
+        else:
+
+            df = pd.read_excel(
+                dataset.file_path
+            )
+
+        report_path = (
+            generate_excel_report(
+                df,
+                f"dataset_{dataset_id}.xlsx"
+            )
+        )
+
+        log_user_activity(
+
+            db=db,
+
+            user_id=current_user.id,
+
+            action=
+            "REPORT_EXCEL_DOWNLOAD",
+
+            details=(
+                f"Excel report "
+                f"downloaded for "
+                f"{dataset.filename}"
+            )
+        )
+
+        NotificationService.create_notification(
+
+            db=db,
+
+            title=
+            "Report Generated",
+
+            message=
+            "Excel report generated successfully",
+
+            user_id=
+            current_user.id,
+
+            notification_type=
+            "report",
+
+            is_admin=False
+        )
+
+        await send_dashboard_update(
+            user_id=current_user.id
+        )
+
+        return report_path
+
+    @staticmethod
+    async def export_pdf_report(
+
+        db: Session,
+
+        dataset_id: int,
+
+        current_user
+    ):
+
+        dataset = (
+
+            db.query(Dataset)
+
+            .filter(
+                Dataset.id == dataset_id,
+
+                Dataset.uploaded_by ==
+                current_user.id
+            )
+
+            .first()
+        )
+
+        if not dataset:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found"
+            )
+
+        if dataset.file_path.endswith(".csv"):
+
+            df = pd.read_csv(
+                dataset.file_path
+            )
+
+        else:
+
+            df = pd.read_excel(
+                dataset.file_path
+            )
+
+        report_path = (
+            generate_pdf_report(
+                df,
+                f"dataset_{dataset_id}.pdf"
+            )
+        )
+
+        log_user_activity(
+
+            db=db,
+
+            user_id=current_user.id,
+
+            action=
+            "REPORT_PDF_DOWNLOAD",
+
+            details=(
+                f"PDF report "
+                f"downloaded for "
+                f"{dataset.filename}"
+            )
+        )
+
+        NotificationService.create_notification(
+
+            db=db,
+
+            title=
+            "Report Generated",
+
+            message=
+            "PDF report generated successfully",
+
+            user_id=
+            current_user.id,
+
+            notification_type=
+            "report",
+
+            is_admin=False
+        )
+
+        await send_dashboard_update(
+            user_id=current_user.id
+        )
+
+        return report_path

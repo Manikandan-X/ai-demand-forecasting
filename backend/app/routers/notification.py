@@ -6,14 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
 
-from app.models.notification import (
-    Notification
-)
-
 from app.models.user import User
 
 from app.core.rbac import (
     analyst_or_viewer_required
+)
+
+from app.services.notification_service import (
+    NotificationService
 )
 
 router = APIRouter(
@@ -27,32 +27,23 @@ router = APIRouter(
 # =========================
 @router.get("/")
 async def get_notifications(
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: User = Depends(
         analyst_or_viewer_required
     )
 ):
 
-    query = db.query(
-        Notification
-    )
-
-    # super admin sees all
-    if (
-        current_user.role
-        != "super_admin"
-    ):
-
-        query = query.filter(
-            Notification.user_id
-            == current_user.id
+    return (
+        NotificationService
+        .get_notifications(
+            db=db,
+            current_user=current_user
         )
-
-    notifications = query.order_by(
-        Notification.created_at.desc()
-    ).all()
-
-    return notifications
+    )
 
 
 # =========================
@@ -60,35 +51,23 @@ async def get_notifications(
 # =========================
 @router.get("/unread-count")
 async def unread_count(
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: User = Depends(
         analyst_or_viewer_required
     )
 ):
 
-    query = db.query(
-        Notification
-    ).filter(
-        Notification.is_read == False
-    )
-
-    # super admin sees all
-    if (
-        current_user.role
-        != "super_admin"
-    ):
-
-        query = query.filter(
-            Notification.user_id
-            == current_user.id
+    return (
+        NotificationService
+        .get_unread_count(
+            db=db,
+            current_user=current_user
         )
-
-    count = query.count()
-
-    return {
-        "unread_count":
-        count
-    }
+    )
 
 
 # =========================
@@ -96,41 +75,23 @@ async def unread_count(
 # =========================
 @router.put("/mark-all/read")
 async def mark_all_read(
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: User = Depends(
         analyst_or_viewer_required
     )
 ):
 
-    query = db.query(
-        Notification
-    ).filter(
-        Notification.is_read == False
-    )
-
-    # super admin sees all
-    if (
-        current_user.role
-        != "super_admin"
-    ):
-
-        query = query.filter(
-            Notification.user_id
-            == current_user.id
+    return (
+        NotificationService
+        .mark_all_as_read(
+            db=db,
+            current_user=current_user
         )
-
-    notifications = query.all()
-
-    for item in notifications:
-
-        item.is_read = True
-
-    db.commit()
-
-    return {
-        "message":
-        "All notifications marked as read"
-    }
+    )
 
 
 # =========================
@@ -140,48 +101,36 @@ async def mark_all_read(
     "/{notification_id}/read"
 )
 async def mark_as_read(
+
     notification_id: int,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: User = Depends(
         analyst_or_viewer_required
     )
 ):
 
-    query = db.query(
-        Notification
-    ).filter(
-        Notification.id
-        == notification_id
+    result = (
+        NotificationService
+        .mark_as_read(
+            db=db,
+            notification_id=
+            notification_id,
+            current_user=
+            current_user
+        )
     )
 
-    # prevent other users
-    # reading someone else's
-    # notification
-    if (
-        current_user.role
-        != "super_admin"
-    ):
-
-        query = query.filter(
-            Notification.user_id
-            == current_user.id
-        )
-
-    notification = query.first()
-
-    if not notification:
+    if not result:
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Notification "
-                "not found"
-            )
+            detail=
+            "Notification not found"
         )
-
-    notification.is_read = True
-
-    db.commit()
 
     return {
         "message":

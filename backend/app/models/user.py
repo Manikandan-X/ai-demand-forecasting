@@ -1,15 +1,26 @@
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
+from sqlalchemy import Index
 
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-
+from sqlalchemy import Boolean
 
 class User(Base):
 
     __tablename__ = "users"
+    
+    __table_args__ = (
+
+        Index(
+            "idx_user_email_role",
+            "email",
+            "role"
+        ),
+
+    )
 
     id = Column(
         Integer,
@@ -42,6 +53,12 @@ class User(Base):
     role = Column(
         String(50),
         default="viewer",
+        index=True
+    )
+    
+    is_active = Column(
+        Boolean,
+        default=True,
         index=True
     )
 

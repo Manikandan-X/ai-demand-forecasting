@@ -4,6 +4,7 @@ from sqlalchemy import Float
 from sqlalchemy import String
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
+from sqlalchemy import Index
 
 from sqlalchemy.orm import relationship
 
@@ -15,6 +16,22 @@ from app.db.base import Base
 class ForecastHistory(Base):
 
     __tablename__ = "forecast_history"
+    
+    __table_args__ = (
+
+        Index(
+            "idx_forecast_user_created",
+            "user_id",
+            "created_at"
+        ),
+
+        Index(
+            "idx_forecast_dataset_created",
+            "dataset_id",
+            "created_at"
+        ),
+
+    )
 
     id = Column(
         Integer,
@@ -41,6 +58,11 @@ class ForecastHistory(Base):
 
     accuracy = Column(
         Float
+    )
+    
+    confidence_score = Column(
+        Float,
+        default=0
     )
 
     forecast_result = Column(

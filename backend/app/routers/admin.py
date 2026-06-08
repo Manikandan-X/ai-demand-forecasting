@@ -36,6 +36,10 @@ from app.models.user_activity import (
     UserActivity
 )
 
+from app.services.automation_dashboard_service import (
+    AutomationDashboardService
+)
+
 router = APIRouter(
     prefix="/admin",
     tags=["Admin"]
@@ -567,3 +571,16 @@ async def system_monitoring(
         "latest_activities":
         latest_activities
     }
+    
+# =========================
+# AUTOMATION DASHBOARD
+# =========================
+@router.get(
+    "/automation/stats"
+)
+def automation_stats():
+
+    return (
+        AutomationDashboardService
+        .get_automation_stats()
+    )

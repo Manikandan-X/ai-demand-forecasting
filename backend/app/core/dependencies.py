@@ -1,16 +1,29 @@
-from jose import JWTError, jwt
+from jose import (
+    JWTError,
+    jwt
+)
 
-from fastapi import Depends
-from fastapi import HTTPException
+from fastapi import (
+    Depends,
+    HTTPException
+)
 
-from fastapi.security import HTTPAuthorizationCredentials
-from fastapi.security import HTTPBearer
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer
+)
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import (
+    Session
+)
 
-from app.db.deps import get_db
+from app.db.deps import (
+    get_db
+)
 
-from app.models.user import User
+from app.models.user import (
+    User
+)
 
 from app.core.config import (
     SECRET_KEY,
@@ -19,40 +32,107 @@ from app.core.config import (
 
 security = HTTPBearer()
 
+JWT_ISSUER = (
+    "ai-demand-forecasting"
+)
+
+JWT_AUDIENCE = (
+    "forecast-users"
+)
+
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+
+    credentials:
+    HTTPAuthorizationCredentials
+    = Depends(security),
+
+    db: Session =
+    Depends(get_db)
 ):
 
-    token = credentials.credentials
+    token = (
+        credentials.credentials
+    )
 
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials"
+    credentials_exception = (
+        HTTPException(
+            status_code=401,
+            detail=(
+                "Could not validate "
+                "credentials"
+            )
+        )
     )
 
     try:
 
         payload = jwt.decode(
             token,
+
             SECRET_KEY,
-            algorithms=[ALGORITHM]
+
+            algorithms=[
+                ALGORITHM
+            ],
+
+            audience=
+            JWT_AUDIENCE
         )
 
-        email: str = payload.get("sub")
+        issuer = payload.get(
+            "iss"
+        )
 
-        if email is None:
-            raise credentials_exception
+        token_type = payload.get(
+            "type"
+        )
+
+        email = payload.get(
+            "sub"
+        )
+
+        if (
+            issuer !=
+            JWT_ISSUER
+        ):
+
+            raise (
+                credentials_exception
+            )
+
+        if (
+            token_type
+            != "access"
+        ):
+
+            raise (
+                credentials_exception
+            )
+
+        if not email:
+
+            raise (
+                credentials_exception
+            )
 
     except JWTError:
-        raise credentials_exception
 
-    user = db.query(User).filter(
-        User.email == email
+        raise (
+            credentials_exception
+        )
+
+    user = db.query(
+        User
+    ).filter(
+        User.email ==
+        email
     ).first()
 
     if user is None:
-        raise credentials_exception
+
+        raise (
+            credentials_exception
+        )
 
     return user

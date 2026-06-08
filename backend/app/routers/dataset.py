@@ -1,53 +1,36 @@
-import os
-import shutil
-import uuid
-
 from fastapi import APIRouter
 from fastapi import UploadFile
 from fastapi import File
 from fastapi import Depends
-from fastapi import HTTPException
 from fastapi import Query
+from fastapi import Request
 
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
 
-from app.models.dataset import Dataset
 from app.models.user import User
+
+from app.core.rate_limiter import (
+    limiter
+)
 
 from app.core.rbac import (
     admin_or_analyst_required,
     analyst_or_viewer_required
 )
 
-from app.services.dataset_service import (
-    process_dataset
+from app.services.dataset_manager_service import (
+    DatasetManagerService
 )
-
-from app.utils.notification_utils import (
-    create_notification
-)
-
-from app.routers.websocket import (
-    send_dashboard_update
-)
-
-from app.utils.activity_logger import (
-    log_user_activity
-)
-from app.utils.cache_utils import clear_dashboard_cache
 
 router = APIRouter(
     prefix="/dataset",
     tags=["Dataset"]
 )
 
-UPLOAD_FOLDER = "uploads"
-
-os.makedirs(
-    UPLOAD_FOLDER,
-    exist_ok=True
+dataset_manager = (
+    DatasetManagerService()
 )
 
 
@@ -55,7 +38,12 @@ os.makedirs(
 # UPLOAD DATASET
 # ==========================
 @router.post("/upload")
+@limiter.limit(
+    "20/minute"
+)
 async def upload_dataset(
+
+    request: Request,
 
     file: UploadFile = File(...),
 
@@ -66,134 +54,14 @@ async def upload_dataset(
     )
 ):
 
-    try:
-
-        allowed_extensions = [
-            ".csv",
-            ".xlsx"
-        ]
-
-        file_extension = os.path.splitext(
-            file.filename
-        )[1].lower()
-
-        if (
-            file_extension
-            not in allowed_extensions
-        ):
-
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Only CSV and "
-                    "Excel files allowed"
-                )
-            )
-
-        # unique filename
-        unique_filename = (
-            f"{current_user.id}_"
-            f"{uuid.uuid4()}_"
-            f"{file.filename}"
-        )
-
-        file_path = os.path.join(
-            UPLOAD_FOLDER,
-            unique_filename
-        )
-
-        with open(
-            file_path,
-            "wb"
-        ) as buffer:
-
-            shutil.copyfileobj(
-                file.file,
-                buffer
-            )
-
-        dataset = Dataset(
-            filename=file.filename,
-            file_path=file_path,
-            uploaded_by=current_user.id
-        )
-
-        db.add(dataset)
-
-        db.commit()
-
-        db.refresh(dataset)
-
-        # activity log
-        log_user_activity(
+    return await (
+        dataset_manager
+        .upload_dataset(
+            file=file,
             db=db,
-            user_id=current_user.id,
-            action="DATASET_UPLOAD",
-            details=(
-                f"{dataset.filename} "
-                f"uploaded"
-            )
+            current_user=current_user
         )
-
-        # dataset processing
-        summary = process_dataset(
-            file_path
-        )
-        
-        #clear_dashboard_cache(current_user.id)
-
-        # success notification
-        await create_notification(
-            db=db,
-            title="Dataset Uploaded",
-            message=(
-                f"{dataset.filename} "
-                f"uploaded successfully"
-            ),
-            user_id=current_user.id,
-            notification_type="upload",
-            is_admin=False
-        )
-
-        # realtime dashboard refresh
-        await send_dashboard_update(
-            user_id=current_user.id
-        )
-
-        return {
-            "message":
-            "Dataset uploaded successfully",
-
-            "dataset_id":
-            dataset.id,
-
-            "filename":
-            dataset.filename,
-
-            "summary":
-            summary
-        }
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-
-        await create_notification(
-            db=db,
-            title="Upload Failed",
-            message=(
-                "Dataset upload failed"
-            ),
-            user_id=current_user.id,
-            notification_type="upload",
-            is_admin=False
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+    )
 
 
 # ==========================
@@ -220,39 +88,15 @@ def get_datasets(
     )
 ):
 
-    skip = (
-        page - 1
-    ) * limit
-
-    query = db.query(
-        Dataset
-    )
-
-    # non-admin only sees own
-    if current_user.role != "super_admin":
-
-        query = query.filter(
-            Dataset.uploaded_by ==
-            current_user.id
+    return (
+        dataset_manager
+        .get_datasets(
+            db=db,
+            current_user=current_user,
+            page=page,
+            limit=limit
         )
-
-    total = query.count()
-
-    datasets = (
-        query.order_by(
-            Dataset.created_at.desc()
-        )
-        .offset(skip)
-        .limit(limit)
-        .all()
     )
-
-    return {
-        "page": page,
-        "limit": limit,
-        "total": total,
-        "datasets": datasets
-    }
 
 
 # ==========================
@@ -270,24 +114,14 @@ def search_datasets(
     )
 ):
 
-    query = db.query(
-        Dataset
+    return (
+        dataset_manager
+        .search_datasets(
+            db=db,
+            current_user=current_user,
+            keyword=keyword
+        )
     )
-
-    if current_user.role != "super_admin":
-
-        query = query.filter(
-            Dataset.uploaded_by ==
-            current_user.id
-        )
-
-    datasets = query.filter(
-        Dataset.filename.ilike(
-            f"%{keyword}%"
-        )
-    ).all()
-
-    return datasets
 
 
 # ==========================
@@ -307,33 +141,12 @@ def filter_datasets(
     )
 ):
 
-    query = db.query(
-        Dataset
+    return (
+        dataset_manager
+        .filter_datasets(
+            db=db,
+            current_user=current_user,
+            start_date=start_date,
+            end_date=end_date
+        )
     )
-
-    if current_user.role != "super_admin":
-
-        query = query.filter(
-            Dataset.uploaded_by ==
-            current_user.id
-        )
-
-    if start_date:
-
-        query = query.filter(
-            Dataset.created_at >=
-            start_date
-        )
-
-    if end_date:
-
-        query = query.filter(
-            Dataset.created_at <=
-            end_date
-        )
-
-    datasets = query.order_by(
-        Dataset.created_at.desc()
-    ).all()
-
-    return datasets

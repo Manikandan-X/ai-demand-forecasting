@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from fastapi import Depends
-from fastapi import HTTPException
+
+from fastapi import Request
 
 from sqlalchemy.orm import Session
 
@@ -13,19 +14,19 @@ from app.schemas.user import (
     UserLogin
 )
 
-from app.core.security import (
-    hash_password,
-    verify_password,
-    create_access_token
+from app.core.rate_limiter import (
+    limiter
 )
 
 from app.core.dependencies import (
     get_current_user
 )
 
-from app.utils.activity_logger import (
-    log_user_activity
+from app.services.auth_service import (
+    AuthService
 )
+
+auth_service = AuthService()
 
 router = APIRouter(
     prefix="/auth",
@@ -38,146 +39,46 @@ router = APIRouter(
 # =========================
 @router.post("/register")
 def register_user(
+
     user: UserCreate,
-    db: Session = Depends(get_db)
+
+    db: Session =
+    Depends(get_db)
 ):
 
-    existing_user = db.query(
-        User
-    ).filter(
-        User.email == user.email
-    ).first()
-
-    if existing_user:
-
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Email already "
-                "registered"
-            )
-        )
-
-    hashed_password = (
-        hash_password(
-            user.password
+    return (
+        AuthService
+        .register_user(
+            db=db,
+            user=user
         )
     )
-
-    new_user = User(
-        name=user.name,
-        email=user.email,
-        password=hashed_password,
-
-        # default role
-        role="viewer"
-    )
-
-    db.add(new_user)
-
-    db.commit()
-
-    db.refresh(new_user)
-
-    log_user_activity(
-        db=db,
-        user_id=new_user.id,
-        action="REGISTER",
-        details=(
-            "User account "
-            "created"
-        )
-    )
-
-    return {
-        "message":
-        "User registered successfully"
-    }
 
 
 # =========================
 # LOGIN USER
 # =========================
 @router.post("/login")
+@limiter.limit(
+    "10/minute"
+)
 def login_user(
+
+    request: Request,
+
     user: UserLogin,
-    db: Session = Depends(get_db)
+
+    db: Session =
+    Depends(get_db)
 ):
 
-    existing_user = db.query(
-        User
-    ).filter(
-        User.email == user.email
-    ).first()
-
-    if not existing_user:
-
-        raise HTTPException(
-            status_code=401,
-            detail=(
-                "Invalid email "
-                "or password"
-            )
-        )
-
-    valid_password = (
-        verify_password(
-            user.password,
-            existing_user.password
+    return (
+        AuthService
+        .login_user(
+            db=db,
+            user=user
         )
     )
-
-    if not valid_password:
-
-        raise HTTPException(
-            status_code=401,
-            detail=(
-                "Invalid email "
-                "or password"
-            )
-        )
-
-    access_token = (
-        create_access_token(
-            data={
-                "sub":
-                existing_user.email
-            }
-        )
-    )
-
-    log_user_activity(
-        db=db,
-        user_id=existing_user.id,
-        action="LOGIN",
-        details=(
-            "User logged in"
-        )
-    )
-
-    return {
-
-        "access_token":
-        access_token,
-
-        "token_type":
-        "bearer",
-
-        "user": {
-
-            "id":
-            existing_user.id,
-
-            "name":
-            existing_user.name,
-
-            "email":
-            existing_user.email,
-
-            "role":
-            existing_user.role
-        }
-    }
 
 
 # =========================

@@ -127,6 +127,28 @@ export default function DashboardStats({
 
       icon:
         <FaExclamationTriangle />
+    },
+
+    {
+      title:
+        "Growth %",
+
+      value:
+        `${analytics?.growth_percentage || 0}%`,
+
+      icon:
+        <FaChartLine />
+    },
+
+    {
+      title:
+        "Confidence",
+
+      value:
+        `${analytics?.forecast_confidence || 0}%`,
+
+      icon:
+        <FaChartLine />
     }
   ];
 

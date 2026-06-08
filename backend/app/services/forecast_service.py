@@ -67,10 +67,27 @@ def generate_forecast(file_path: str):
             )
         })
 
+    confidence_score = max(
+        0,
+        min(
+            100,
+            100 - (
+                accuracy /
+                max(y_test.mean(), 1)
+            ) * 100
+        )
+    )
+
     return {
         "forecast_accuracy_mae": round(
             float(accuracy),
             2
         ),
+
+        "confidence_score": round(
+            float(confidence_score),
+            2
+        ),
+
         "future_predictions": forecast_results
     }
