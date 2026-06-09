@@ -113,45 +113,82 @@ export default function ForecastIntelligence() {
     ]);
   };
 
+  // ── Safe array extractor ───────────────────
+  const toArr = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    const first = Object.values(val).find(Array.isArray);
+    return first || [];
+  };
+
   // ── Derived data ───────────────────────────
 
-  // Model comparison bar chart
-  const comparisonData = (dashboard?.model_comparison || []).map((m) => ({
-    name:     m.model_name || m.model || "Model",
+  // Model comparison — service returns array of { model, accuracy, created_at }
+  // accuracy can be raw MAE number so we clamp display to 2dp, no % cap needed
+  const comparisonData = toArr(dashboard?.model_comparison ?? dashboard?.comparison).map((m) => ({
+    name:     m.model || m.model_name || "Model",
     accuracy: parseFloat(m.accuracy || 0).toFixed(2),
   }));
 
-  // Accuracy trends line chart
-  const trendsData = (dashboard?.accuracy_trends || []).map((t, i) => ({
-    name:     t.model_name || t.label || `Run ${i + 1}`,
+  // Accuracy trends — service returns array of { date, model, accuracy }
+  const trendsData = toArr(dashboard?.accuracy_trends ?? dashboard?.trends).map((t, i) => ({
+    name:     t.model || t.model_name || `Run ${i + 1}`,
     accuracy: parseFloat(t.accuracy || 0).toFixed(2),
   }));
 
-  // Confidence gauge value (0–100)
+  // Business recommendations — service returns:
+  // { confidence_score: 85, recommendations: ["string1", "string2"] }
+  // We normalise plain strings into { text } objects for the table
+  const rawRec = dashboard?.recommendations;
+  const recommendationsData = (() => {
+    if (!rawRec) return [];
+    // already an array of strings
+    if (Array.isArray(rawRec)) {
+      return rawRec.map((r, i) => ({
+        text: typeof r === "string" ? r : r.text || r.description || JSON.stringify(r),
+        index: i,
+      }));
+    }
+    // { confidence_score, recommendations: [...] }
+    if (Array.isArray(rawRec?.recommendations)) {
+      return rawRec.recommendations.map((r, i) => ({
+        text: typeof r === "string" ? r : r.text || r.description || JSON.stringify(r),
+        index: i,
+      }));
+    }
+    return [];
+  })();
+
+  // Confidence — service returns { confidence_score: number }
+  const rawConf = dashboard?.confidence;
   const confidenceScore = parseFloat(
-    dashboard?.confidence?.confidence_score ||
-    dashboard?.confidence?.score ||
-    0
+    rawConf?.confidence_score ??
+    rawConf?.score ??
+    (typeof rawConf === "number" ? rawConf : 0)
   );
 
   const confidenceColor =
     confidenceScore >= 75 ? "#4ade80" :
     confidenceScore >= 50 ? "#facc15" : "#f87171";
 
-  // Recommendations table
+  // Recommendations — plain strings normalised to { text, index }
   const recColumns = [
-    { key: "title",       label: "Title",      sortable: true },
-    { key: "description", label: "Recommendation" },
     {
-      key: "priority", label: "Priority", sortable: true,
-      render: (v) => <Badge label={v} styleMap={PRIORITY_STYLE} />,
+      key: "text",
+      label: "Recommendation",
+      render: (v) => (
+        <span className="flex items-start gap-2">
+          <span className="text-cyan-500 mt-0.5 flex-shrink-0">💡</span>
+          <span>{v}</span>
+        </span>
+      ),
     },
   ];
 
   // Historical comparison table
+  // Historical — service returns { model, accuracy, forecast, created_at }
   const histColumns = [
-    { key: "model",      label: "Model",    sortable: true },
-    { key: "dataset_id", label: "Dataset",  sortable: true },
+    { key: "model",    label: "Model",    sortable: true },
     {
       key: "accuracy", label: "Accuracy", sortable: true,
       render: (v) => (
@@ -321,7 +358,7 @@ export default function ForecastIntelligence() {
                         />
                         <StatChip
                           label="Recommendations"
-                          value={dashboard?.recommendations?.length || 0}
+                          value={recommendationsData.length}
                           color="yellow"
                         />
                       </div>
@@ -448,9 +485,9 @@ export default function ForecastIntelligence() {
               ) : (
                 <Table
                   columns={recColumns}
-                  data={dashboard?.recommendations || []}
+                  data={recommendationsData}
                   emptyText="No recommendations available"
-                  rowKey={(row) => row.title + row.priority}
+                  rowKey="index"
                 />
               )}
             </Section>
@@ -466,11 +503,11 @@ export default function ForecastIntelligence() {
               ) : (
                 <>
                   {/* Accuracy distribution mini chart */}
-                  {(history?.history || []).length > 0 && (
-                    <div className="h-48 mb-6">
+                  {toArr(history?.history).length > 0 && (
+                    <div className="h-48 mb-6 min-h-[192px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
-                          data={(history.history || []).map((h, i) => ({
+                          data={toArr(history?.history).map((h, i) => ({
                             name: h.model || `#${i + 1}`,
                             accuracy: parseFloat(h.accuracy || 0).toFixed(2),
                           }))}
@@ -504,9 +541,9 @@ export default function ForecastIntelligence() {
 
                   <Table
                     columns={histColumns}
-                    data={history?.history || []}
+                    data={toArr(history?.history)}
                     emptyText="No historical forecasts found"
-                    rowKey={(row, i) => `${row.model}-${i}`}
+                    rowKey={(_, i) => i}
                   />
                 </>
               )}

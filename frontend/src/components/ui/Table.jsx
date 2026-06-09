@@ -33,7 +33,8 @@ export default function Table({
     }
   };
 
-  const sorted = [...data].sort((a, b) => {
+  const safeData = Array.isArray(data) ? data : [];
+  const sorted = [...safeData].sort((a, b) => {
     if (!sortKey) return 0;
     const av = a[sortKey];
     const bv = b[sortKey];
@@ -46,8 +47,14 @@ export default function Table({
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const getKey = (row, i) =>
-    typeof rowKey === "function" ? rowKey(row) : (row[rowKey] ?? i);
+  const getKey = (row, i) => {
+    if (typeof rowKey === "function") {
+      const k = rowKey(row, i);
+      return k ?? i;
+    }
+    const k = row[rowKey];
+    return k != null ? k : i;
+  };
 
   return (
     <div className="w-full overflow-x-auto rounded-2xl border border-gray-200 dark:border-slate-700">
